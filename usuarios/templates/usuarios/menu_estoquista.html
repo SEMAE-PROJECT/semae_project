@@ -1,0 +1,33 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <title>Menu do Estoquista | SEMAE</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'usuarios/base.css' %}">
+    <link rel="stylesheet" href="{% static 'usuarios/menu_principal.css' %}">
+</head>
+<body>
+    <h1>Página Inicial - Estoquista</h1>
+
+    <p class="saudacao">Olá, <strong>{{ user.username }}</strong>! Escolha uma opção abaixo:</p>
+
+    <div class="menu-grid">
+        <a href="{% url 'listar_tipos_produto' %}" class="menu-card card-estoque">
+            <span class="card-icon">📦</span>
+            <h2>Catálogo e Estoque</h2>
+            <p>Consulte todos os produtos, verifique saldos e dê baixa em lotes atuais.</p>
+        </a>
+        
+        <a href="{% url 'listar_pedidos_envio' %}" class="menu-card card-destaque">
+            <span class="card-icon">🚚</span>
+            <h2>Pedidos para Envio</h2>
+            <p>Separe os pedidos aprovados e dê baixa no estoque para entrega.</p>
+        </a>
+    </div>
+
+    <div class="menu-rodape">
+        <a href="{% url 'logout_usuario' %}" class="button-sair">Sair do Sistema</a>
+    </div>
+</body>
+</html>

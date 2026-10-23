@@ -25,6 +25,7 @@ class Usuario(AbstractUser):
         ('SECRETARIO', 'Secretário'),
         ('DIRETOR', 'Diretor Escolar'),
         ('NUTRICIONISTA', 'Nutricionista'),
+        ('ESTOQUISTA', 'Estoquista'), # Novo perfil adicionado
     )
     
     cargo = models.CharField(max_length=20, choices=FUNCOES)
@@ -37,6 +38,9 @@ class Usuario(AbstractUser):
     
     def is_nutricionista(self):
         return self.cargo == 'NUTRICIONISTA'
+        
+    def is_estoquista(self):
+        return self.cargo == 'ESTOQUISTA'
     
 
 class PerfilEscola(models.Model):

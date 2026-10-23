@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="{% static 'usuarios/base.css' %}">
     <link rel="stylesheet" href="{% static 'usuarios/menu_principal.css' %}">
 </head>
-
 <body>
     <h1>Página Inicial - Nutricionista</h1>
 
@@ -17,19 +16,13 @@
         <a href="{% url 'listar_pedidos_pendentes' %}" class="menu-card card-destaque">
             <span class="card-icon">📋</span>
             <h2>Analisar Pedidos Pendentes</h2>
-            <p>Verifique e aprove os novos pedidos das escolas.</p>
-        </a>
-
-        <a href="{% url 'listar_tipos_produto' %}" class="menu-card card-estoque">
-            <span class="card-icon">📦</span>
-            <h2>Gerenciar Estoque</h2>
-            <p>Cadastrar, dar baixa e controlar os lotes de produtos.</p>
+            <p>Verifique e aprove os pedidos de Alimentação e Limpeza.</p>
         </a>
 
         <a href="{% url 'historico_pedidos' %}" class="menu-card card-consulta">
             <span class="card-icon">📅</span>
             <h2>Histórico de Pedidos</h2>
-            <p>Consulte todos os pedidos já aprovados e entregues.</p>
+            <p>Consulte todos os pedidos já processados.</p>
         </a>
     </div>
 
@@ -37,5 +30,4 @@
         <a href="{% url 'logout_usuario' %}" class="button-sair">Sair do Sistema</a>
     </div>
 </body>
-
 </html>

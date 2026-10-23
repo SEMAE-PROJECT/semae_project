@@ -1,11 +1,9 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.contrib.auth.decorators import login_required, user_passes_test
-from .forms import TipoProdutoForm, ItemPedidoForm, Loteform, AdicionarEstoqueForm, BaixaEstoqueForm
-from usuarios.views import is_nutricionista, is_secretario_or_nutricionista
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required, user_passes_test
-from .models import Pedido, ItemPedido, TipoProduto, Lote, Usuario
+from .forms import TipoProdutoForm, ItemPedidoForm, Loteform, AdicionarEstoqueForm, BaixaEstoqueForm, ItemEspecialForm
+from usuarios.views import is_nutricionista, is_estoquista, pode_ver_estoque
+from .models import Pedido, ItemPedido, TipoProduto, Lote, Usuario, ItemEspecial
 from django.db import transaction
 from django.db.models import Q, F, Sum, IntegerField, OuterRef, Subquery, DecimalField
 from django.db.models.functions import Coalesce
@@ -23,10 +21,11 @@ import matplotlib.pyplot as plt
 import io
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
+from django.contrib import messages
+from django.shortcuts import redirect
 
-# Apenas nutricionista ou secretário pode ver a lista de produtos do estoque
 @login_required
-@user_passes_test(is_secretario_or_nutricionista) 
+@user_passes_test(pode_ver_estoque) 
 def listar_tipos_produto(request):
     tipos_produto = TipoProduto.objects.all()
     
@@ -57,26 +56,40 @@ def listar_tipos_produto(request):
         'ativo': ativo or 'True',
     }) 
 
-
-
-# Apenas nutricionista pode cadastrar produtos no estoque
 @login_required
-@user_passes_test(is_secretario_or_nutricionista)
+@user_passes_test(is_estoquista)
 def cadastrar_tipo_produto(request):
     if request.method == 'POST':
         form = TipoProdutoForm(request.POST)
+        lote_form = Loteform(request.POST) 
+        
         if form.is_valid():
-            form.save()
+            produto = form.save()
+            
+            # Se for um cadastro novo, tentamos salvar o lote inicial
+            # Forçamos a validação de datas para falso se o produto não pedir
+            if not produto.possui_data_fabricacao:
+                lote_form.errors.pop('data_fabricacao', None)
+            if not produto.possui_data_validade:
+                lote_form.errors.pop('data_validade', None)
+                
+            if lote_form.is_valid():
+                lote = lote_form.save(commit=False)
+                lote.tipo_produto = produto
+                lote.save()
+                messages.success(request, f"Produto '{produto.nome}' e lote inicial cadastrados com sucesso!")
+            else:
+                messages.warning(request, f"Produto '{produto.nome}' criado, mas verifique os dados do lote inicial.")
+                
             return redirect('listar_tipos_produto')
     else:
         form = TipoProdutoForm()
+        lote_form = Loteform()
     
-    return render(request, 'produtos/cadastrar_tipo.html', {'form': form})
+    return render(request, 'produtos/cadastrar_tipo.html', {'form': form, 'lote_form': lote_form})
 
-
-# Apenas nutricionista ou secretário pode listar lotes de produtos no estoque
 @login_required
-@user_passes_test(is_secretario_or_nutricionista)
+@user_passes_test(pode_ver_estoque)
 def listar_lotes(request, tipo_produto_id):
     tipo_produto = get_object_or_404(TipoProduto, pk=tipo_produto_id)
     lotes = Lote.objects.filter(tipo_produto=tipo_produto).order_by(F('data_validade').asc(nulls_last=True))
@@ -99,11 +112,8 @@ def listar_lotes(request, tipo_produto_id):
     context = {'tipo_produto': tipo_produto, 'lotes': lotes}
     return render(request, 'produtos/listar_lotes.html', context)
     
-
-
-# Apenas nutricionista pode cadastrar lotes de produtos no estoque
 @login_required
-@user_passes_test(is_nutricionista)
+@user_passes_test(is_estoquista)
 def cadastrar_lote(request, tipo_produto_id):
     tipo_produto = get_object_or_404(TipoProduto, id=tipo_produto_id)
 
@@ -123,11 +133,8 @@ def cadastrar_lote(request, tipo_produto_id):
     }
     return render(request, 'produtos/cadastrar_lote.html', context)
 
-
-
-# Apenas nutricionista pode editar tipos de produtos no estoque
 @login_required
-@user_passes_test(is_nutricionista)
+@user_passes_test(is_estoquista)
 def editar_tipo_produto(request, tipo_produto_id):
     tipo_produto = get_object_or_404(TipoProduto, pk=tipo_produto_id)
     
@@ -144,11 +151,8 @@ def editar_tipo_produto(request, tipo_produto_id):
         'editar': True
     })
     
-    
-
-# Apenas nutricionista pode excluir tipos de produtos no estoque
 @login_required
-@user_passes_test(is_nutricionista)
+@user_passes_test(is_estoquista)
 def excluir_tipo_produto(request, tipo_produto_id):
     tipo_produto = get_object_or_404(TipoProduto, pk=tipo_produto_id)
     
@@ -160,11 +164,8 @@ def excluir_tipo_produto(request, tipo_produto_id):
 
     return render(request, 'produtos/excluir_tipo.html', {'tipo_produto': tipo_produto}) 
 
-
-
-# Apenas nutricionista pode reativar um produto desativado
 @login_required
-@user_passes_test(is_nutricionista)
+@user_passes_test(is_estoquista)
 def reativar_tipo_produto(request, tipo_produto_id):
     tipo_produto = get_object_or_404(TipoProduto, pk=tipo_produto_id)
     
@@ -176,10 +177,8 @@ def reativar_tipo_produto(request, tipo_produto_id):
     
     return render(request, 'produtos/reativar_tipo.html', {'tipo_produto': tipo_produto})
 
-
-# Apenas nutricionista pode adicionar produto no estoque
 @login_required
-@user_passes_test(is_nutricionista)
+@user_passes_test(is_estoquista)
 def adicionar_estoque(request, lote_id):
     lote = get_object_or_404(Lote, pk=lote_id)
     
@@ -197,10 +196,8 @@ def adicionar_estoque(request, lote_id):
     
     return render(request, 'produtos/adicionar_estoque.html', {'form': form, 'lote': lote}) 
 
-
-# Apenas nutricionista pode baixar produtos do estoque
 @login_required
-@user_passes_test(is_nutricionista)
+@user_passes_test(is_estoquista)
 def baixar_estoque(request, lote_id):
     lote = get_object_or_404(Lote, pk=lote_id)
     
@@ -224,11 +221,8 @@ def baixar_estoque(request, lote_id):
         'form': form, 
     })
 
-
-
-# Apenas nutricionista pode editar lotes do estoque
 @login_required
-@user_passes_test(is_nutricionista)
+@user_passes_test(is_estoquista)
 def editar_lote(request, lote_id):
     lote = get_object_or_404(Lote, pk=lote_id)
     
@@ -247,11 +241,8 @@ def editar_lote(request, lote_id):
         'tipo_produto': lote.tipo_produto,
     })
 
-
-
-# Apenas nutricionista pode excluir lotes do estoque
 @login_required
-@user_passes_test(is_nutricionista)
+@user_passes_test(is_estoquista)
 def excluir_lote(request, lote_id):
     lote = get_object_or_404(Lote, pk=lote_id)
     
@@ -260,8 +251,6 @@ def excluir_lote(request, lote_id):
         return redirect('listar_lotes', tipo_produto_id=lote.tipo_produto.id)
     
     return render(request, 'produtos/excluir_lote.html', {'lote': lote})
-
-
 
 def exportar_excel(dados, mes, ano, usuario, total_pedidos, total_pedidos_carne, lista_detalhada_carne):
     
@@ -1009,11 +998,20 @@ def gerar_relatorio_tipos(request):
 
 # Apenas diretor pode fazer um pedido
 @login_required
-@user_passes_test(lambda u: u.is_diretor())
 def criar_pedido(request):
-    novo_pedido = Pedido.objects.create(solicitante=request.user)
-    return redirect('detalhe_pedido', pedido_id=novo_pedido.id)
+    # Captura a categoria escolhida no clique do botão (via URL)
+    categoria = request.GET.get('categoria')
 
+    # Cria o pedido com a categoria correta se ela for válida
+    if categoria in ['ALIMENTICIO_LIMPEZA', 'ESCOLAR']:
+        pedido = Pedido.objects.create(
+            solicitante=request.user,
+            status='PENDENTE',
+            categoria=categoria
+        )
+        return redirect('detalhe_pedido', pedido_id=pedido.id)
+
+    return redirect('meus_pedidos')
 
 
 # Apenas um diretor pode ver os detalhes do seu pedido
@@ -1022,7 +1020,14 @@ def criar_pedido(request):
 def detalhe_pedido(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id, solicitante=request.user)
     
-    produtos_validos = TipoProduto.objects.filter(ativo=True).annotate(
+    # Filtra os produtos válidos baseado na CATEGORIA do pedido
+    if pedido.categoria == 'ESCOLAR':
+        produtos_validos = TipoProduto.objects.filter(ativo=True, tipo='ESCOLAR')
+    else:
+        produtos_validos = TipoProduto.objects.filter(ativo=True, tipo__in=['ALIMENTO', 'LIMPEZA', 'OUTROS'])
+
+    # Soma o estoque e remove os zerados
+    produtos_validos = produtos_validos.annotate(
         total_estoque=Coalesce(
             Sum('lotes__quantidade_pacotes'),
             0,
@@ -1030,79 +1035,105 @@ def detalhe_pedido(request, pedido_id):
         )
     ).filter(total_estoque__gt=0)
     
+    form_comum = ItemPedidoForm()
+    form_comum.fields['produto'].queryset = produtos_validos
+    form_especial = ItemEspecialForm() # Formulário que criaremos no próximo passo
+    
     if request.method == 'POST':
-        form = ItemPedidoForm(request.POST)
-        form.fields['produto'].queryset = produtos_validos
-        
-        if form.is_valid():
-            produto_selecionado = form.cleaned_data['produto']
-            quantidade_adicionar = form.cleaned_data['quantidade']
+        # Se o formulário enviado for o de Item Comum
+        if 'add_item_comum' in request.POST:
+            form_comum = ItemPedidoForm(request.POST)
+            form_comum.fields['produto'].queryset = produtos_validos
             
-            estoque_atual = produtos_validos.get(pk=produto_selecionado.pk).total_estoque
-            item_existente = ItemPedido.objects.filter(pedido=pedido, produto=produto_selecionado).first()
-            quantidade_existente = item_existente.quantidade if item_existente else 0
-            quantidade_final_desejada = quantidade_existente + quantidade_adicionar
+            if form_comum.is_valid():
+                produto_selecionado = form_comum.cleaned_data['produto']
+                quantidade_adicionar = form_comum.cleaned_data['quantidade']
+                
+                estoque_atual = produtos_validos.get(pk=produto_selecionado.pk).total_estoque
+                item_existente = ItemPedido.objects.filter(pedido=pedido, produto=produto_selecionado).first()
+                quantidade_existente = item_existente.quantidade if item_existente else 0
+                quantidade_final_desejada = quantidade_existente + quantidade_adicionar
 
-            if quantidade_final_desejada > estoque_atual:
-                messages.error(request, f"Estoque insuficiente para '{produto_selecionado.nome}'. "
-                                        f"Disponível: {estoque_atual}, "
-                                        f"Solicitado: {quantidade_final_desejada}.")
-            else:
-                if item_existente:
-                    item_existente.quantidade += quantidade_adicionar
-                    item_existente.save()
-                    messages.success(request, f"Quantidade de '{produto_selecionado.nome}' atualizada.")
+                # Validação de Estoque Insuficiente
+                if quantidade_final_desejada > estoque_atual:
+                    messages.error(request, f"Estoque insuficiente para '{produto_selecionado.nome}'. "
+                                            f"Disponível: {estoque_atual}, "
+                                            f"Solicitado no total: {quantidade_final_desejada}.")
                 else:
-                    item = form.save(commit=False)
-                    item.pedido = pedido
-                    item.save()
-                    messages.success(request, f"'{produto_selecionado.nome}' adicionado ao pedido.")
-            
-            return redirect('detalhe_pedido', pedido_id=pedido.id)
-        
-        else:
-            form = ItemPedidoForm()
-            form.fields['produto'].queryset = produtos_validos
-    else:
-        form = ItemPedidoForm()
-        form.fields['produto'].queryset = produtos_validos
-        
+                    if item_existente:
+                        item_existente.quantidade += quantidade_adicionar
+                        item_existente.save()
+                        messages.success(request, f"Quantidade de '{produto_selecionado.nome}' atualizada.")
+                    else:
+                        item = form_comum.save(commit=False)
+                        item.pedido = pedido
+                        item.save()
+                        messages.success(request, f"'{produto_selecionado.nome}' adicionado ao pedido.")
+                
+                return redirect('detalhe_pedido', pedido_id=pedido.id)
+
+        # Se o formulário enviado for o de Item Especial
+        elif 'add_item_especial' in request.POST:
+            form_especial = ItemEspecialForm(request.POST)
+            if form_especial.is_valid():
+                item_esp = form_especial.save(commit=False)
+                item_esp.pedido = pedido
+                item_esp.save()
+                messages.success(request, f"Solicitação especial '{item_esp.descricao}' adicionada.")
+                return redirect('detalhe_pedido', pedido_id=pedido.id)
+                
     itens_do_pedido = pedido.itens.all()
+    itens_especiais = pedido.itens_especiais.all()
 
     context = {
         'pedido': pedido,
         'itens': itens_do_pedido,
-        'form': form,
+        'itens_especiais': itens_especiais,
+        'form': form_comum,
+        'form_especial': form_especial,
     }
     return render(request, 'pedidos/detalhe_pedido.html', context)
 
 
-
-#Apenas diretor pode remover um item de um pedido respectivamente seu
+# Apenas diretor pode remover um item comum de um pedido
 @login_required
 @user_passes_test(lambda u: u.is_diretor())
 def remover_item_pedido(request, item_id):
     item = get_object_or_404(ItemPedido, id=item_id)
-
     pedido_id = item.pedido.id
 
     if item.pedido.solicitante == request.user:
         item.delete()
-
+        messages.success(request, "Item removido do pedido.")
         return redirect('detalhe_pedido', pedido_id=pedido_id)
     else:
         return HttpResponseForbidden("Você não tem permissão para remover este item.")
 
 
 
+# Nova função: Remover Item Especial
+@login_required
+@user_passes_test(lambda u: u.is_diretor())
+def remover_item_especial(request, item_id):
+    item = get_object_or_404(ItemEspecial, id=item_id)
+    pedido_id = item.pedido.id
+
+    if item.pedido.solicitante == request.user:
+        item.delete()
+        messages.success(request, "Solicitação especial removida.")
+        return redirect('detalhe_pedido', pedido_id=pedido_id)
+    else:
+        return HttpResponseForbidden("Você não tem permissão para remover este item.")
+
+
 # Apenas diretor pode ver seus próprios pedidos
 @login_required
 @user_passes_test(lambda u: u.is_diretor())
 def meus_pedidos(request):
-    
     pedidos_do_diretor = Pedido.objects.filter(
-        solicitante=request.user,
-        itens__isnull=False 
+        solicitante=request.user
+    ).filter(
+        Q(itens__isnull=False) | Q(itens_especiais__isnull=False)
     ).distinct().order_by('-data_pedido')
     
     context = {
@@ -1112,33 +1143,27 @@ def meus_pedidos(request):
     return render(request, 'pedidos/meus_pedidos.html', context)
 
 
-
-# Apenas diretor pode finalizar um pedido e encaminha-lo a nutricionista
+# Apenas diretor pode finalizar um pedido
 @login_required
 @user_passes_test(lambda u: u.is_diretor())
 def finalizar_pedido(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
     
     if request.method == 'POST':
-        observacao = request.POST.get('obs_carne')
-        
-        if observacao:
-            pedido.observacao_carne = observacao
-            
+        # O campo 'observacao_carne' não existe mais. 
+        # Tudo isso é tratado agora pelos Itens Especiais!
         pedido.status = 'PENDENTE' 
         pedido.save()
+        messages.success(request, "Pedido finalizado e enviado para aprovação!")
         
         return redirect('meus_pedidos')
 
     return redirect('detalhe_pedido', pedido_id=pedido.id)
 
-
-
 # Apenas diretor pode verificar o estoque disponível
 @login_required
 @user_passes_test(lambda u: u.is_diretor())
 def listar_estoque_disponivel(request):
-
     produtos = TipoProduto.objects.filter(ativo=True).annotate(
         total_estoque=Coalesce(
             Sum('lotes__quantidade_pacotes'), 
@@ -1147,12 +1172,7 @@ def listar_estoque_disponivel(request):
         )
     ).order_by('nome')
     
-    context = {
-        'produtos': produtos
-    }
-    
-    return render(request, 'produtos/estoque_disponivel.html', context)
-
+    return render(request, 'produtos/estoque_disponivel.html', {'produtos': produtos})
 
 
 # Apenas diretor pode excluir seu próprio pedido
@@ -1172,61 +1192,143 @@ def excluir_pedido(request, pedido_id):
     return redirect('meus_pedidos')
 
 
-
-# Apenas nutricionista pode ver a lista de pedidos pendentes
+# Nutricionista e Secretário veem pedidos pendentes (filtrados por categoria)
 @login_required
-@user_passes_test(lambda u: u.is_nutricionista())
+@user_passes_test(lambda u: u.is_nutricionista() or u.is_secretario())
 def listar_pedidos_pendentes(request):
-
     pedidos = Pedido.objects.filter(
-        status='PENDENTE', 
-        itens__isnull=False
+        status='PENDENTE'
+    ).filter(
+        Q(itens__isnull=False) | Q(itens_especiais__isnull=False)
     ).select_related('solicitante__escola').distinct().order_by('data_pedido')
     
-    context = {
-        'pedidos': pedidos
-    }
-    return render(request, 'pedidos/listar_pedidos_pendentes.html', context)
+    # Filtro de Categoria baseado no Cargo
+    if request.user.is_nutricionista():
+        pedidos = pedidos.filter(categoria='ALIMENTICIO_LIMPEZA')
+    elif request.user.is_secretario():
+        pedidos = pedidos.filter(categoria='ESCOLAR')
+        
+    return render(request, 'pedidos/listar_pedidos_pendentes.html', {'pedidos': pedidos})
 
 
-
-# Apenas nutricionista pode ver os detalhes de um pedido
+# Gestores veem detalhes do pedido
 @login_required
-@user_passes_test(lambda u: u.is_nutricionista())
-def detalhe_pedido_nutricionista(request, pedido_id):
+@user_passes_test(lambda u: u.is_nutricionista() or u.is_secretario())
+def detalhe_pedido_gestor(request, pedido_id):
+    # NOTA: Renomeie o template 'detalhe_pedido_nutricionista.html' para 'detalhe_pedido_gestor.html' nas suas pastas
     pedido = get_object_or_404(Pedido.objects.select_related('solicitante', 'solicitante__escola'), id=pedido_id)
-    context = {
-        'pedido': pedido
-    }
-    return render(request, 'pedidos/detalhe_pedido_nutricionista.html', context)
+    
+    # Trava de segurança
+    if pedido.categoria == 'ESCOLAR' and not request.user.is_secretario():
+        return HttpResponseForbidden("Apenas a Secretaria pode acessar pedidos escolares.")
+    elif pedido.categoria == 'ALIMENTICIO_LIMPEZA' and not request.user.is_nutricionista():
+        return HttpResponseForbidden("Apenas a Nutricionista pode acessar pedidos alimentícios.")
+
+    return render(request, 'pedidos/detalhe_pedido_gestor.html', {'pedido': pedido})
 
 
-
-# Apenas nutricionista pode aprovar um pedido
+# Gestores aprovam pedido (SEM dar baixa no estoque)
 @login_required
-@user_passes_test(lambda u: u.is_nutricionista())
+@user_passes_test(lambda u: u.is_nutricionista() or u.is_secretario())
 def aprovar_pedido(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id)
     
+    if pedido.categoria == 'ESCOLAR' and not request.user.is_secretario():
+        messages.error(request, "Apenas a Secretaria pode aprovar pedidos de Material Escolar.")
+        return redirect('listar_pedidos_pendentes')
+    elif pedido.categoria == 'ALIMENTICIO_LIMPEZA' and not request.user.is_nutricionista():
+        messages.error(request, "Apenas a Nutricionista pode aprovar pedidos Alimentícios/Limpeza.")
+        return redirect('listar_pedidos_pendentes')
+        
     if pedido.status != 'PENDENTE':
         messages.error(request, f"O pedido #{pedido.id} não está pendente.")
         return redirect('listar_pedidos_pendentes')
     
     if request.method == 'POST':
+        pedido.status = 'APROVADO'
+        pedido.save()
+        messages.success(request, f"Pedido #{pedido.id} aprovado! Ele foi encaminhado ao Estoquista para separação e envio.")
+
+    return redirect('listar_pedidos_pendentes')
+
+
+@login_required
+@user_passes_test(lambda u: u.is_nutricionista() or u.is_secretario())
+def rejeitar_pedido(request, pedido_id):
+    pedido = get_object_or_404(Pedido, id=pedido_id)
+    
+    if request.method == 'POST':
+        motivo = request.POST.get('justificativa')
+        pedido.status = 'REJEITADO'
+        pedido.justificativa_rejeicao = motivo
+        pedido.save()
+        messages.success(request, f"Pedido #{pedido.id} rejeitado. Motivo registrado.")
+        return redirect('listar_pedidos_pendentes')
+    
+    return redirect('detalhe_pedido_gestor', pedido_id=pedido.id)
+
+
+@login_required
+@user_passes_test(lambda u: u.is_nutricionista() or u.is_secretario())
+def historico_pedidos(request):
+    pedidos_recentes = Pedido.objects.filter(
+        status__in=['APROVADO', 'REJEITADO', 'ENTREGUE']
+    ).select_related('solicitante__escola').order_by('-data_pedido')
+    
+    if request.user.is_nutricionista():
+        pedidos_recentes = pedidos_recentes.filter(categoria='ALIMENTICIO_LIMPEZA')
+    elif request.user.is_secretario():
+        pedidos_recentes = pedidos_recentes.filter(categoria='ESCOLAR')
+        
+    return render(request, 'pedidos/historico_pedidos.html', {'pedidos': pedidos_recentes[:20]})
+
+
+@login_required
+@user_passes_test(lambda u: u.is_nutricionista() or u.is_secretario())
+def verificar_pedidos_pendentes(request):
+    contagem = Pedido.objects.filter(status='PENDENTE')
+    if request.user.is_nutricionista():
+        contagem = contagem.filter(categoria='ALIMENTICIO_LIMPEZA')
+    elif request.user.is_secretario():
+        contagem = contagem.filter(categoria='ESCOLAR')
+        
+    return JsonResponse({'count': contagem.count(), 'success': True})
+
+# --- NOVAS VIEWS DO ESTOQUISTA ---
+
+@login_required
+@user_passes_test(is_estoquista)
+def listar_pedidos_envio(request):
+    # O Estoquista vê todos os pedidos APROVADOS (aguardando envio)
+    pedidos = Pedido.objects.filter(status='APROVADO').order_by('data_pedido')
+    return render(request, 'pedidos/listar_pedidos_envio.html', {'pedidos': pedidos})
+
+@login_required
+@user_passes_test(is_estoquista)
+def detalhe_pedido_envio(request, pedido_id):
+    pedido = get_object_or_404(Pedido, id=pedido_id, status='APROVADO')
+    return render(request, 'pedidos/detalhe_pedido_envio.html', {'pedido': pedido})
+
+@login_required
+@user_passes_test(is_estoquista)
+def despachar_pedido(request, pedido_id):
+    pedido = get_object_or_404(Pedido, id=pedido_id, status='APROVADO')
+
+    if request.method == 'POST':
         try:
             with transaction.atomic():
-                
                 produtos_ids = pedido.itens.values_list('produto_id', flat=True)
                 produtos_com_estoque = TipoProduto.objects.filter(id__in=produtos_ids).annotate(
                     estoque_atual=Sum('lotes__quantidade_pacotes')
                 )
                 estoque_map = {p.id: p.estoque_atual or 0 for p in produtos_com_estoque}
                 
+                # Valida se ainda há estoque suficiente no momento do envio
                 for item in pedido.itens.all():
-                    quantidade_solicitada = item.quantidade
-                    if quantidade_solicitada > estoque_map.get(item.produto.id, 0):
-                        raise Exception(f"Estoque insuficiente para o produto '{item.produto.nome}'.")
+                    if item.quantidade > estoque_map.get(item.produto.id, 0):
+                        raise Exception(f"Estoque insuficiente para '{item.produto.nome}'.")
 
+                # Debita do estoque
                 for item in pedido.itens.all():
                     quantidade_a_baixar = item.quantidade
                     lotes_disponiveis = Lote.objects.filter(
@@ -1237,137 +1339,20 @@ def aprovar_pedido(request, pedido_id):
                     for lote in lotes_disponiveis:
                         if quantidade_a_baixar == 0:
                             break
-                        
                         if lote.quantidade_pacotes >= quantidade_a_baixar:
                             lote.quantidade_pacotes -= quantidade_a_baixar
                             quantidade_a_baixar = 0
                         else:
                             quantidade_a_baixar -= lote.quantidade_pacotes
                             lote.quantidade_pacotes = 0
-                            
                         lote.save()
-                pedido.status = 'APROVADO'
+                
+                # Muda status final
+                pedido.status = 'ENTREGUE'
                 pedido.save()
-                messages.success(request, f"Pedido #{pedido.id} aprovado e estoque atualizado!")
+                messages.success(request, f"Pedido #{pedido.id} despachado com sucesso! Estoque debitado.")
 
         except Exception as e:
-            messages.error(request, f"Erro ao aprovar o pedido #{pedido.id}: {e}")
+            messages.error(request, f"Erro ao despachar o pedido #{pedido.id}: {e}")
 
-    return redirect('listar_pedidos_pendentes')
-
-
-
-# Apenas nutricionista pode rejeitar um pedido
-@login_required
-@user_passes_test(lambda u: u.is_nutricionista())
-def rejeitar_pedido(request, pedido_id):
-    pedido = get_object_or_404(Pedido, id=pedido_id)
-    
-    if request.method == 'POST':
-        motivo = request.POST.get('justificativa')
-        
-        pedido.status = 'REJEITADO'
-        pedido.justificativa_rejeicao = motivo
-        pedido.save()
-        
-        messages.success(request, f"Pedido #{pedido.id} rejeitado. Motivo registrado.")
-        return redirect('listar_pedidos_pendentes')
-    
-    return redirect('detalhe_pedido_nutricionista', pedido_id=pedido.id)
-
-
-
-# Apenas nutricionista pode verificar o historico de pedidos
-@login_required
-@user_passes_test(lambda u: u.is_nutricionista())
-def historico_pedidos(request):
-    pedidos_recentes = Pedido.objects.filter(
-        Q(status='APROVADO') | Q(status='REJEITADO')
-    ).select_related('solicitante__escola').order_by('-data_pedido')[:20]  
-
-    context = {
-        'pedidos': pedidos_recentes
-    }
-    
-    return render(request, 'pedidos/historico_pedidos.html', context)
-
-
-
-# Apenas nutricionista pode acessar a lista de pedidos pendentes
-@login_required
-@user_passes_test(lambda u: u.is_nutricionista())
-def verificar_pedidos_pendentes(request):
-    if not request.user.is_nutricionista():
-        return JsonResponse({'count': 0, 'sucess': False})
-    
-    contagem = Pedido.objects.filter(status='PENDENTE').count()
-    return JsonResponse({'count': contagem, 'success': True})
-
-
-
-@login_required
-@user_passes_test(lambda u: u.is_diretor())
-def menu_diretor(request):
-    return render(request, 'usuarios/menu_diretor.html')
-   
-   
-
-# Apenas diretor pode excluir seu próprio pedido    
-@login_required
-@user_passes_test(lambda u: u.is_diretor())
-def excluir_pedido(request, pedido_id):
-    pedido = get_object_or_404(Pedido, id=pedido_id, solicitante=request.user)
-
-    if pedido.status == 'PENDENTE':
-        numero = pedido.id
-        pedido.delete() 
-        messages.success(request, f"Pedido #{numero} excluído com sucesso.")
-    else:
-        messages.error(request, "Você só pode excluir pedidos que ainda estão pendentes.")
-
-    return redirect('meus_pedidos')
-
-
-
-# Apenas secretário pode acessar a lista de pedidos de carne
-@login_required
-@user_passes_test(lambda u: u.is_secretario())
-def lista_compras_secretario(request):
-    lista = Pedido.objects.exclude(observacao_carne__exact='') \
-                          .exclude(observacao_carne__isnull=True) \
-                          .filter(carne_comprada=False) \
-                          .select_related('solicitante__escola')
-
-    return render(request, 'pedidos/compras_diretas.html', {'lista': lista})
-
-
-
-
-# Apenas secretário pode marcar o pedido de carne como comprado
-@login_required
-@user_passes_test(lambda u: u.is_secretario())
-def marcar_carne_comprada(request, pedido_id):
-    pedido = get_object_or_404(Pedido, id=pedido_id)
-    pedido.carne_comprada = True
-    pedido.save()
-    return redirect('lista_compras_secretario')
-
-
-
-# Apenas secretário pode negar pedido de carne direta
-@login_required
-@user_passes_test(lambda u: u.is_secretario())
-def negar_compra_direta(request, pedido_id):
-    pedido = get_object_or_404(Pedido, id=pedido_id)
-    
-    if request.method == 'POST':
-        justificativa = request.POST.get('justificativa_secretario')
-        
-        pedido.justificativa_secretario = justificativa
-        pedido.carne_comprada = True  # Marcando como "processado" para sair da lista de pendentes
-        pedido.save()
-        
-        messages.warning(request, f"Solicitação do Pedido #{pedido.id} negada.")
-        return redirect('lista_compras_secretario')
-
-    return redirect('lista_compras_secretario')
+    return redirect('listar_pedidos_envio')

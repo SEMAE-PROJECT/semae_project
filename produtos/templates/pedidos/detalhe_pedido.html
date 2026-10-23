@@ -7,18 +7,57 @@
     <title>Detalhes do Pedido #{{ pedido.id }}</title>
     <link rel="stylesheet" href="{% static 'produtos/estoque_lista.css' %}">
     <link rel="stylesheet" href="{% static 'produtos/detalhe_pedido.css' %}">
+    <style>
+        /* CSS para ocultar elementos da interface ao imprimir */
+        @media print {
+            .no-print, nav, footer, .form-adicionar, .button-place, .acoes-pedido {
+                display: none !important;
+            }
+            body { background-color: white !important; color: black !important; }
+            .container { box-shadow: none !important; width: 100% !important; margin: 0 !important; }
+        }
+
+        .alert {
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .alert-error {
+            background-color: #f8d7da;
+        }
+
+        .alert-success {
+            background-color: #d4edda;
+        }
+    </style>
 </head>
 
 <body>
     <div class="container">
         
+        <!-- Mensagens de Alerta (Estoque Insuficiente, Sucesso, etc) -->
+        {% if messages %}
+            <div class="mensagens-alerta no-print" style="margin-bottom: 20px;">
+                {% for message in messages %}
+                    <div class="alert {% if message.tags == 'error' %}alert-error{% else %}alert-success{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
         <div class="pedido-info">
-            <h1>Pedido de Solicitação #{{ pedido.id }}</h1>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h1>Pedido de Solicitação #{{ pedido.id }} ({{ pedido.get_categoria_display }})</h1>
+                <button onclick="window.print()" class="btn btn-secondary no-print" style="padding: 8px 15px; cursor: pointer;">
+                    🖨️ Imprimir Pedido
+                </button>
+            </div>
             
             {% if pedido.status == 'REJEITADO' and pedido.justificativa_rejeicao %}
                 <div class="aviso-rejeicao">
                     <h3>⛔ Pedido Rejeitado</h3>
-                    <p><strong>A nutricionista deixou a seguinte observação:</strong></p>
+                    <p><strong>Motivo da rejeição:</strong></p>
                     <div class="texto-justificativa">
                         "{{ pedido.justificativa_rejeicao }}"
                     </div>
@@ -29,14 +68,14 @@
         </div>
 
         <div class="itens-lista">
-            <h2>Itens no Pedido</h2>
+            <h2>Itens Padrão no Pedido</h2>
             {% if itens %}
             <table>
                 <thead>
                     <tr>
                         <th>Produto</th>
                         <th>Quantidade</th>
-                        <th>Ações</th>
+                        <th class="no-print">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -44,7 +83,7 @@
                     <tr>
                         <td>{{ item.produto.nome }}</td>
                         <td>{{ item.quantidade }}</td>
-                        <td>
+                        <td class="no-print">
                             {% if pedido.status == 'PENDENTE' %}
                             <form method="post" action="{% url 'remover_item_pedido' item.id %}" style="display: inline-table;">
                                 {% csrf_token %}
@@ -59,102 +98,82 @@
                 </tbody>
             </table>
             {% else %}
-            <p>Nenhum item adicionado a este pedido ainda.</p>
+            <p>Nenhum item padrão adicionado a este pedido ainda.</p>
             {% endif %}
         </div>
+        
+        <div class="itens-lista" style="margin-top: 20px;">
+            <h2>Itens Especiais (Fora do Estoque)</h2>
+            {% if itens_especiais %}
+            <table style="background-color: #fff3cd;">
+                <thead>
+                    <tr>
+                        <th>Descrição</th>
+                        <th>Quantidade/Unidade</th>
+                        <th class="no-print">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for especial in itens_especiais %}
+                    <tr>
+                        <td>{{ especial.descricao }}</td>
+                        <td>{{ especial.quantidade }} {{ especial.unidade }}</td>
+                        <td class="no-print">
+                            {% if pedido.status == 'PENDENTE' %}
+                            <form method="post" action="{% url 'remover_item_especial' especial.id %}" style="display: inline-table;">
+                                {% csrf_token %}
+                                <button type="submit" onclick="return confirm('Tem certeza que deseja remover esta solicitação especial?');">Remover</button>
+                            </form>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>Nenhum item especial adicionado.</p>
+            {% endif %}
+        </div>
+        
         <hr>
 
         {% if pedido.status == 'PENDENTE' %}
-        <div class="form-adicionar">
-            <h2>Adicionar Novo Item</h2>
-            <form method="post" id="form-adicionar-item">
-                {% csrf_token %}
-                {{ form.as_p }}
-                
-                <button type="submit" class="btn btn-primary">Adicionar Item ao Pedido</button>
-
-                {% if not pedido.carne_comprada and not pedido.observacao_carne %}
-                    <button type="submit" form="form-especial" class="btn btn-success">Salvar Solicitação</button>
-                {% endif %}
-            </form>
-        </div> 
-        {% endif %}
-
-        <br>
-
-        <h3>Solicitação Especial</h3>
-
-        {% if pedido.carne_comprada %}
-            
-            {% if pedido.justificativa_secretario %}
-                <div class="card border-danger mb-3">
-                    <div class="card-header bg-danger text-white">
-                        <strong>❌ Solicitação Não Atendida</strong>
-                    </div>
-                    <div class="card-body text-danger">
-                        <h5 class="card-title">A secretaria não pôde realizar esta compra.</h5>
-                        <p class="card-text">
-                            <strong>Motivo informado:</strong><br>
-                            <div class="texto-justificativa">
-                                "{{ pedido.justificativa_secretario }}"
-                            </div>
-                        </p>
-                        <hr>
-                        <p class="card-text text-dark">
-                            <strong>Item que havia sido solicitado:</strong><br>
-                            {{ pedido.observacao_carne|linebreaks }}
-                        </p>
-                    </div>
-                </div>
-
-            {% else %}
-                <div class="card border-success mb-3">
-                    <div class="card-header bg-success text-white">
-                        <strong>✅ Compra Realizada!</strong>
-                    </div>
-                    <div class="card-body text-success">
-                        <h5 class="card-title">O Secretário já efetuou esta compra.</h5>
-                        <p class="card-text text-dark">
-                            <strong>Item solicitado:</strong><br>
-                            {{ pedido.observacao_carne|linebreaks }}
-                        </p>
-                        <hr>
-                        <small class="text-muted">Este item foi processado e arquivado pela secretaria.</small>
-                    </div>
-                </div>
-            {% endif %}
-
-        {% elif pedido.observacao_carne %}
-            <div class="alert" role="alert">
-                <h4 class="alert-heading alert-warning">⏳ Enviado para a Secretaria</h4>
-                <p>Você solicitou: <strong>{{ pedido.observacao_carne }}</strong></p>
-                <hr>
-                <p class="mb-0">Aguardando o Secretário visualizar e processar o pedido.</p>
-            </div>
-
-            <details>
-                <summary class="sumario">Clique para editar o texto</summary>
-                <br>
-                <form method="POST" action="{% url 'finalizar_pedido' pedido.id %}">
+        <div class="form-adicionar no-print" style="display: flex; gap: 30px;">
+            <!-- Formulário de Itens de Estoque -->
+            <div style="flex: 1;">
+                <h3>Adicionar Item de Estoque</h3>
+                <form method="post">
                     {% csrf_token %}
-                    <textarea name="obs_carne" class="form-control" rows="3">{{ pedido.observacao_carne }}</textarea>
-                    <button type="submit" class="btn btn-primary mt-2">Atualizar Texto</button>
+                    {{ form.as_p }}
+                    <button type="submit" name="add_item_comum" class="btn btn-primary">Adicionar Item Padrão</button>
                 </form>
-            </details>
-
-        {% else %}
-            <p>Use este espaço para pedir itens que vêm direto do mercado e não passam pelo estoque (ex: carne).</p>
-            <form method="POST" action="{% url 'finalizar_pedido' pedido.id %}" id="form-especial">
+            </div>
+            
+            <!-- Formulário de Itens Especiais -->
+            <div style="flex: 1; border-left: 1px solid #ccc; padding-left: 30px;">
+                <h3>Adicionar Solicitação Especial</h3>
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form_especial.as_p }}
+                    <button type="submit" name="add_item_especial" class="btn btn-warning">Adicionar Item Especial</button>
+                </form>
+            </div>
+        </div> 
+        
+        <div class="acoes-pedido no-print" style="margin-top: 40px; text-align: center; background: #f8f9fa; padding: 20px; border-radius: 8px;">
+            <h3>Deseja concluir e enviar para aprovação?</h3>
+            <form method="POST" action="{% url 'finalizar_pedido' pedido.id %}" onsubmit="return confirm('Verificou todos os itens? O pedido será enviado para análise e você não poderá mais alterá-lo.');">
                 {% csrf_token %}
-                <div class="form-group mb-3">
-                    <textarea name="obs_carne" class="form-control" rows="5" placeholder="Digite aqui sua solicitação (Ex: 20kg de Acém, 10kg de Frango)..."></textarea>
-                </div>
+                <button type="submit" class="btn btn-success" style="font-size: 1.2em; padding: 10px 30px;">Finalizar Pedido</button>
             </form>
+        </div>
         {% endif %}
 
         <br><br>
 
-        <div class="button-place">
+        <div class="button-place no-print">
             <a href="{% url 'menu_diretor' %}" class="btn-custom-modern btn-back-dark">← Voltar ao Menu</a>
             <a href="{% url 'meus_pedidos' %}" class="btn-custom-modern btn-primary-blue">Ver Meus Pedidos</a>
         </div>

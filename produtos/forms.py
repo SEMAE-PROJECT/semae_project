@@ -1,6 +1,5 @@
 from django import forms
-from .models import TipoProduto, Lote
-from .models import ItemPedido
+from .models import TipoProduto, Lote, ItemPedido, ItemEspecial
 
 class TipoProdutoForm(forms.ModelForm):
     class Meta:
@@ -36,7 +35,6 @@ class Loteform(forms.ModelForm):
             'observacoes'
         ]
         
-
 class AdicionarEstoqueForm(forms.Form):
     quantidade_pacotes = forms.IntegerField(
         label='Quantidade a adicionar',
@@ -48,7 +46,8 @@ class BaixaEstoqueForm(forms.Form):
     quantidade_pacotes = forms.IntegerField(
         label='Quantidade a dar baixa',
         min_value=1,
-        widget=forms.NumberInput(attrs={'class': 'form-control'})    )
+        widget=forms.NumberInput(attrs={'class': 'form-control'})    
+    )
         
 class ItemPedidoForm(forms.ModelForm):
     produto = forms.ModelChoiceField(
@@ -66,3 +65,14 @@ class ItemPedidoForm(forms.ModelForm):
         self.fields['produto'].label_from_instance = (
             lambda obj: f"{obj.nome} ({obj.unidade_medida}) - Estoque: {getattr(obj, 'total_estoque', 0)}"
         )
+
+# --- NOVO FORMULÁRIO ---
+class ItemEspecialForm(forms.ModelForm):
+    class Meta:
+        model = ItemEspecial
+        fields = ['descricao', 'unidade', 'quantidade']
+        widgets = {
+            'descricao': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Detergente Ypê, 1kg Peito de Frango...'}),
+            'unidade': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex: Pct, Kg, Cx, Unid'}),
+            'quantidade': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Ex: 2.5'})
+        }

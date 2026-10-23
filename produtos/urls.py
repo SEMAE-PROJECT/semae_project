@@ -18,7 +18,7 @@ urlpatterns = [
     path('lotes/baixar/<int:lote_id>/', views.baixar_estoque, name='baixar_estoque'),
     path('lotes/excluir/<int:lote_id>/', views.excluir_lote, name='excluir_lote'),
     
-    #URLs para relatórios
+    # URLs para relatórios
     path('relatorios/mensal/', views.filtros_relatorio_mensal, name='filtros_relatorio_mensal'),
     path('relatorios/mensal/gerar/', views.gerar_relatorio_mensal, name='gerar_relatorio_mensal'),
     path('relatorios/agricultura/', views.gerar_relatorio_origem, name='gerar_relatorio_origem'),
@@ -28,18 +28,18 @@ urlpatterns = [
     path('pedidos/novo/', views.criar_pedido, name='criar_pedido'),
     path('pedidos/<int:pedido_id>/', views.detalhe_pedido, name='detalhe_pedido'),
     path('pedidos/item/remover/<int:item_id>/', views.remover_item_pedido, name='remover_item_pedido'),
+    path('pedidos/remover-especial/<int:item_id>/', views.remover_item_especial, name='remover_item_especial'),
     path('pedidos/meus/', views.meus_pedidos, name='meus_pedidos'),
     path('pedidos/<int:pedido_id>/finalizar/', views.finalizar_pedido, name='finalizar_pedido'),
     path('estoque/', views.listar_estoque_disponivel, name='estoque_disponivel'),
     path('pedidos/<int:pedido_id>/excluir/', views.excluir_pedido, name='excluir_pedido'),
     path('pedidos/pendentes/', views.listar_pedidos_pendentes, name='listar_pedidos_pendentes'),
-    path('pedidos/<int:pedido_id>/analisar/', views.detalhe_pedido_nutricionista, name='detalhe_pedido_nutricionista'),
+    path('pedidos/<int:pedido_id>/analisar/', views.detalhe_pedido_gestor, name='detalhe_pedido_gestor'),
     path('pedidos/<int:pedido_id>/aprovar/', views.aprovar_pedido, name='aprovar_pedido'),
     path('pedidos/<int:pedido_id>/rejeitar/', views.rejeitar_pedido, name='rejeitar_pedido'),
     path('pedidos/historico/', views.historico_pedidos, name='historico_pedidos'),
     path('api/pedidos/pendentes/contagem/', verificar_pedidos_pendentes, name='contagem_pedidos_pendentes'),
-    path('pedidos/compras-diretas/', views.lista_compras_secretario, name='lista_compras_secretario'),
-    path('pedidos/<int:pedido_id>/marcar-comprado/', views.marcar_carne_comprada, name='marcar_carne_comprada'),
-    path('pedido/negar-compra/<int:pedido_id>/', views.negar_compra_direta, name='negar_compra_direta'),
-
+    path('pedidos/envio/', views.listar_pedidos_envio, name='listar_pedidos_envio'),
+    path('pedidos/<int:pedido_id>/envio/', views.detalhe_pedido_envio, name='detalhe_pedido_envio'),
+    path('pedidos/<int:pedido_id>/despachar/', views.despachar_pedido, name='despachar_pedido'),
 ]

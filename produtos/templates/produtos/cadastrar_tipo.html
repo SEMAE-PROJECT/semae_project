@@ -4,32 +4,34 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Novo Tipo de Produto</title>
+    <title>{% if editar %}Editar Produto{% else %}Novo Produto e Lote{% endif %}</title>
     <link rel="stylesheet" href="{% static 'produtos/estoque_lista.css' %}">
     <link rel="stylesheet" href="{% static 'produtos/cadastra_tipo.css' %}">
 </head>
 
 <body>
-    <h1>Novo Tipo de Produto</h1>
+    <h1>{% if editar %}Editar Produto{% else %}Novo Produto e Estoque Inicial{% endif %}</h1>
 
     <div class="form-container">
-        <form method="post">
+        <!-- Confirmação no submit do form -->
+        <form method="post" onsubmit="return confirm('Confirma os dados informados para este produto e lote?');">
             {% csrf_token %}
 
-            {% if form.non_field_errors %}
+            {% if form.non_field_errors or lote_form.non_field_errors %}
             <div class="form-group alert-error">
-                <p><strong>Erro Geral no Cadastro:</strong></p>
+                <p><strong>Erro no Cadastro:</strong></p>
                 <ul class="errorlist">
-                    {% for error in form.non_field_errors %}
-                    <li>{{ error }}</li>
-                    {% endfor %}
+                    {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                    {% for error in lote_form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
                 </ul>
             </div>
             {% endif %}
 
             <div class="form-layout-grid">
-
+                
+                <!-- Coluna de Produto -->
                 <div class="col-principal-fields">
+                    <h2>Dados do Produto</h2>
                     {% for field in form %}
                     {% if field.name == 'nome' or field.name == 'tipo' or field.name == 'unidade_medida' or field.name == 'origem_compra' %}
                     <div class="form-group">
@@ -37,48 +39,53 @@
                         {{ field }}
                         {% if field.errors %}
                         <ul class="errorlist">
-                            {% for error in field.errors %}
-                            <li>{{ error }}</li>
-                            {% endfor %}
+                            {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
                         </ul>
                         {% endif %}
                     </div>
                     {% endif %}
                     {% endfor %}
-                </div>
-
-                <div class="col-rastreamento-button">
-
-                    <div class="rastreamento-box">
-                        <h2>Configurações de Rastreamento (Datas)</h2>
-
+                    
+                    <div class="rastreamento-box" style="margin-top: 15px;">
+                        <h3>Configurações de Rastreamento (Datas)</h3>
                         <div class="form-group-checkbox">
-                            <label for="{{ form.possui_data_fabricacao.id_for_label }}">
-                                {{ form.possui_data_fabricacao }}
-                                {{ form.possui_data_fabricacao.label }}
-                            </label>
-                            {% for error in form.possui_data_fabricacao.errors %}
-                            <p class="errorlist">{{ error }}</p>
-                            {% endfor %}
-                            <small class="help-text">Desmarque se o produto não utiliza esta data.</small>
+                            <label>{{ form.possui_data_fabricacao }} {{ form.possui_data_fabricacao.label }}</label>
+                            <small class="help-text">Desmarque se não utiliza.</small>
                         </div>
-
                         <div class="form-group-checkbox">
-                            <label for="{{ form.possui_data_validade.id_for_label }}">
-                                {{ form.possui_data_validade }}
-                                {{ form.possui_data_validade.label }}
-                            </label>
-                            {% for error in form.possui_data_validade.errors %}
-                            <p class="errorlist">{{ error }}</p>
-                            {% endfor %}
-                            <small class="help-text">Desmarque se o produto não utiliza esta data.</small>
+                            <label>{{ form.possui_data_validade }} {{ form.possui_data_validade.label }}</label>
+                            <small class="help-text">Desmarque se não utiliza.</small>
                         </div>
                     </div>
+                </div>
 
-                    <button type="submit" class="button-cadastro">Cadastrar</button>
+                <!-- Coluna de Lote Inicial -->
+                <div class="col-rastreamento-button">
+                    {% if not editar %}
+                    <div class="rastreamento-box" style="background-color: #f1f8ff; border: 1px solid #cce5ff;">
+                        <h2>Estoque Inicial (Lote)</h2>
+                        <div class="form-group">
+                            <label>Qtd de Pacotes/Itens:</label>
+                            {{ lote_form.quantidade_pacotes }}
+                        </div>
+                        <div class="form-group">
+                            <label>Peso/Vol por Pacote (Ex: 1):</label>
+                            {{ lote_form.quantidade_por_pacote }}
+                        </div>
+                        <div class="form-group">
+                            <label>Preço Unitário (R$):</label>
+                            {{ lote_form.preco_unitario }}
+                        </div>
+                        <div class="form-group">
+                            <label>Data de Validade:</label>
+                            {{ lote_form.data_validade }}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <button type="submit" class="button-cadastro" style="margin-top: 20px;">{% if editar %}Salvar Alterações{% else %}Cadastrar Produto e Lote{% endif %}</button>
                 </div>
             </div>
-
         </form>
     </div>
 

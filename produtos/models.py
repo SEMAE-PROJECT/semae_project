@@ -1,10 +1,6 @@
 from django.db import models
 from usuarios.models import Usuario
-
-from django.db import models
-from django.db.models import Sum 
 from django.utils import timezone
-
 
 class TipoProduto(models.Model):
     id = models.AutoField(primary_key=True)
@@ -114,7 +110,7 @@ class Lote(models.Model):
         return self.quantidade_pacotes * qtd_pacote
     
     def __str__(self):
-            return f"Lote de {self.tipo_produto.nome} - Validade: {self.data_validade}"
+        return f"Lote de {self.tipo_produto.nome} Validade: {self.data_validade}"
     
     class Meta:
         ordering = ['data_validade']
@@ -123,6 +119,7 @@ class Lote(models.Model):
         db_table = 'tb_lote'
         get_latest_by = 'data_validade'
         
+
 class Pedido(models.Model):
     STATUS_CHOICES = (
         ('PENDENTE', 'Pendente'),
@@ -131,13 +128,17 @@ class Pedido(models.Model):
         ('ENTREGUE', 'Entregue'),
     )
 
+    CATEGORIA_CHOICES = (
+        ('ALIMENTICIO_LIMPEZA', 'Alimentício e Limpeza'),
+        ('ESCOLAR', 'Material Escolar'),
+    )
+
     solicitante = models.ForeignKey(Usuario, on_delete=models.PROTECT, related_name='pedidos_feitos')
+    categoria = models.CharField(max_length=25, choices=CATEGORIA_CHOICES, default='ALIMENTICIO_LIMPEZA', verbose_name="Categoria do Pedido")
     data_pedido = models.DateTimeField(auto_now_add=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='PENDENTE')
     justificativa_rejeicao = models.TextField(null=True, blank=True, verbose_name="Motivo da Rejeição")
-    justificativa_secretario = models.TextField(null=True, blank=True, verbose_name="Motivo da Rejeição")
-    observacao_carne = models.TextField(blank=True, null=True, verbose_name="Solicitação de Carne/Perecíveis")
-    carne_comprada = models.BooleanField(default=False, verbose_name="Compra de Carne Realizada")
+    justificativa_secretario = models.TextField(null=True, blank=True, verbose_name="Motivo da Rejeição (Secretaria)")
 
     class Meta:
         verbose_name = 'Pedido'
@@ -145,7 +146,8 @@ class Pedido(models.Model):
         ordering = ['-data_pedido']
 
     def __str__(self):
-        return f"Pedido #{self.id} por {self.solicitante.username}"
+        return f"Pedido #{self.id} ({self.get_categoria_display()}) por {self.solicitante.username}"
+
 
 class ItemPedido(models.Model):
     pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name='itens')
@@ -158,3 +160,17 @@ class ItemPedido(models.Model):
 
     def __str__(self):
         return f"{self.quantidade} x {self.produto.nome}"
+
+
+class ItemEspecial(models.Model):
+    pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name='itens_especiais')
+    descricao = models.CharField(max_length=255, verbose_name="Descrição do Item")
+    unidade = models.CharField(max_length=50, verbose_name="Unidade (Ex: Kg, Pct, Un)")
+    quantidade = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Quantidade")
+
+    class Meta:
+        verbose_name = 'Solicitação Especial'
+        verbose_name_plural = 'Solicitações Especiais'
+
+    def __str__(self):
+        return f"{self.quantidade} {self.unidade} de {self.descricao}"

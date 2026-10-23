@@ -1,0 +1,58 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Pedidos para Envio | SEMAE</title>
+    <link rel="stylesheet" href="{% static 'produtos/estoque_lista.css' %}">
+    <link rel="stylesheet" href="{% static 'produtos/pedidos.css' %}"> 
+</head>
+<body>
+    <h1>Pedidos Aguardando Envio</h1>
+    <p>Estes pedidos já foram aprovados e estão prontos para separação no estoque.</p>
+    
+    <!-- Alertas -->
+    {% if messages %}
+        <div class="mensagens-alerta" style="margin-bottom: 20px;">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}" style="padding: 10px; border-radius: 5px;">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <table class="tabela-pedidos">
+        <thead>
+            <tr>
+                <th>Nº do Pedido</th>
+                <th>Categoria</th>
+                <th>Solicitante</th>
+                <th>Data da Solicitação</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pedido in pedidos %}
+            <tr>
+                <td class="pedido-id">#{{ pedido.id }}</td>
+                <td>{{ pedido.get_categoria_display }}</td>
+                <td class="pedido-solicitante">{{ pedido.solicitante.escola.nome_escola|default:pedido.solicitante.username }}</td>
+                <td class="pedido-data">{{ pedido.data_pedido|date:"d/m/Y H:i" }}</td>
+                <td class="pedido-acoes">
+                    <a href="{% url 'detalhe_pedido_envio' pedido.id %}" class="button-analisar" style="background-color: #007bff; color: white; padding: 8px 12px; border-radius: 4px; text-decoration: none;">Separar Itens</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" class="tabela-vazia">Nenhum pedido aguardando envio no momento.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="rodape-link">
+        <a href="{% url 'menu_estoquista' %}" class="link-voltar">← Voltar ao Menu</a>
+    </div>
+</body>
+</html>
