@@ -1,98 +1,73 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="pt-br">
-
 <head>
     <meta charset="UTF-8">
-    <title>Adicionar Novo Lote para {{ tipo_produto.nome }}</title>
+    <title>{% if editar %}Editar Lote #{{ lote.id }}{% else %}Novo Lote - {{ tipo_produto.nome }}{% endif %} | SEMAE</title>
     <link rel="stylesheet" href="{% static 'produtos/estoque_lista.css' %}">
-    <link rel="stylesheet" href="{% static 'produtos/cadastra_lote.css' %}">
+    <link rel="stylesheet" href="{% static 'produtos/cadastra_tipo.css' %}">
 </head>
-
 <body>
-    <h1>Adicionar Novo Lote para {{ tipo_produto.nome }}</h1>
+    <div class="cadastro-wrapper" style="max-width: 650px;">
+        <header class="cadastro-header">
+            <h1>{% if editar %}Editar Lote #{{ lote.id }}{% else %}Nova Entrada de Lote{% endif %}</h1>
+            <p>Produto: <strong>{{ tipo_produto.nome }}</strong> ({{ tipo_produto.get_tipo_display }} — {{ tipo_produto.get_unidade_medida_display }})</p>
+        </header>
 
-    <div class="form-container">
-        <form method="post">
+        <form method="post" id="form-produto">
             {% csrf_token %}
 
-            <div class="form-group">
-                <div class="form-grid-2-col">
-
-                    <div class="form-group-item">
-                        <label for="{{ form.quantidade_pacotes.id_for_label }}">Quantidade:</label>
+            <section class="card-passo card-lote-inicial">
+                <div class="linha-2-col">
+                    <div class="form-group">
+                        <label for="{{ form.quantidade_pacotes.id_for_label }}">
+                            Quantidade ({{ tipo_produto.get_unidade_medida_display }}) *
+                        </label>
                         {{ form.quantidade_pacotes }}
                         {{ form.quantidade_pacotes.errors }}
                     </div>
 
-                    {% if tipo_produto.unidade_medida != 'NA' %}
-                    <div class="form-group-item">
-                        <label for="{{ form.quantidade_por_pacote.id_for_label }}">Peso/Volume por Pacote:</label>
-                        <div class="form-unidade-wrapper">
-                            {{ form.quantidade_por_pacote }}
-                            <span class="unidade-display">{{ tipo_produto.get_unidade_medida_display }}</span>
-                        </div>
-                        {{ form.quantidade_por_pacote.errors }}
+                    <div class="form-group">
+                        <label for="{{ form.preco_unitario.id_for_label }}">
+                            Preço Unitário (R$)
+                        </label>
+                        {{ form.preco_unitario }}
+                        {{ form.preco_unitario.errors }}
                     </div>
-                    {% else %}
-                    <div class="form-group-item">
-                        <p class="unidade-na-info">UoM não aplicável. Quantidade rastreada por Pacotes/Itens.</p>
+                </div>
+
+                <div class="linha-2-col">
+                    {% if tipo_produto.possui_data_fabricacao %}
+                    <div class="form-group">
+                        <label for="{{ form.data_fabricacao.id_for_label }}">Data de Fabricação</label>
+                        {{ form.data_fabricacao }}
+                        {{ form.data_fabricacao.errors }}
+                    </div>
+                    {% endif %}
+
+                    {% if tipo_produto.possui_data_validade %}
+                    <div class="form-group">
+                        <label for="{{ form.data_validade.id_for_label }}">Data de Validade *</label>
+                        {{ form.data_validade }}
+                        {{ form.data_validade.errors }}
                     </div>
                     {% endif %}
                 </div>
-            </div>
 
-            <div class="form-group">
-                <label for="{{ form.preco_unitario.id_for_label }}">Preço Unitário (R$):</label>
                 <div class="form-group">
-                    {{ form.preco_unitario }}
+                    <label for="{{ form.observacoes.id_for_label }}">Observações (Marca, Fornecedor, Nota Fiscal)</label>
+                    {{ form.observacoes }}
+                    {{ form.observacoes.errors }}
                 </div>
-                {{ form.preco_unitario.errors }}
+            </section>
+
+            <div class="rodape-acoes-form">
+                <a href="{% url 'listar_lotes' tipo_produto.id %}" class="btn-cancelar-form">← Voltar para os Lotes</a>
+                <button type="submit" class="btn-salvar-form">
+                    {% if editar %}Salvar Alterações{% else %}Registrar Entrada de Lote{% endif %}
+                </button>
             </div>
-            {% for field in form %}
-
-            {% if field.name == 'quantidade_pacotes' or field.name == 'quantidade_por_pacote' or field.name == 'preco_unitario' %}
-            {% comment %} Ignorado, já renderizado explicitamente {% endcomment %}
-
-            {% elif field.name == 'data_fabricacao' %}
-            {% if tipo_produto.possui_data_fabricacao %}
-            <div class="form-group">
-                <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
-                {{ field }}
-            </div>
-            {% endif %}
-
-            {% elif field.name == 'data_validade' %}
-            {% if tipo_produto.possui_data_validade %}
-            <div class="form-group">
-                <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
-                {{ field }}
-            </div>
-            {% endif %}
-
-            {% else %}
-            <div class="form-group">
-                <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
-                {{ field }}
-            </div>
-            {% endif %}
-
-            {% if field.errors %}
-            <ul class="errorlist">
-                {% for error in field.errors %}
-                <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
-            {% endif %}
-            
-            {% endfor %}
-            <button type="submit" class="button-cadastro">Cadastrar Lote</button>
         </form>
     </div>
-
-    <div class="rodape-link">
-        <a href="{% url 'listar_lotes' tipo_produto.id %}" class="link-cancelar">Cancelar e Voltar para os Lotes</a>
-    </div>
 </body>
-
 </html>

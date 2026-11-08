@@ -26,12 +26,13 @@ class TipoProduto(models.Model):
     )
     
     UNIDADE_CHOICES = (
+        ('UN', 'Unidades (Un)'),
+        ('PCT', 'Pacotes (Pct)'),
+        ('CX', 'Caixas (Cx)'),
         ('KG', 'Quilogramas (KG)'),
         ('G', 'Gramas (g)'),
         ('L', 'Litros (L)'),
         ('ML', 'Mililitros (mL)'),
-        ('UN', 'Unidades (Un)'),
-        ('CX', 'Caixas (Cx)'),
         ('NA', 'Não Aplicável (N/A)')
     )
     
@@ -153,6 +154,7 @@ class ItemPedido(models.Model):
     pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name='itens')
     produto = models.ForeignKey(TipoProduto, on_delete=models.PROTECT, verbose_name="Produto")
     quantidade = models.PositiveIntegerField(default=1)
+    entregue = models.BooleanField(default=False, verbose_name="Item Entregue/Separado")
 
     class Meta:
         verbose_name = 'Item do Pedido'
@@ -161,12 +163,12 @@ class ItemPedido(models.Model):
     def __str__(self):
         return f"{self.quantidade} x {self.produto.nome}"
 
-
 class ItemEspecial(models.Model):
     pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name='itens_especiais')
     descricao = models.CharField(max_length=255, verbose_name="Descrição do Item")
     unidade = models.CharField(max_length=50, verbose_name="Unidade (Ex: Kg, Pct, Un)")
     quantidade = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Quantidade")
+    entregue = models.BooleanField(default=False, verbose_name="Item Entregue/Separado")
 
     class Meta:
         verbose_name = 'Solicitação Especial'

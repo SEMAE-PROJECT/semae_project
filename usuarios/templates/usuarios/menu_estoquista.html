@@ -2,32 +2,65 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <title>Menu do Estoquista | SEMAE</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="{% static 'usuarios/base.css' %}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Estoquista | SEMAE</title>
     <link rel="stylesheet" href="{% static 'usuarios/menu_principal.css' %}">
 </head>
 <body>
-    <h1>Página Inicial - Estoquista</h1>
+    <div class="painel-container">
+        <header class="painel-header">
+            <div>
+                <h1>Painel de Controle do Almoxarifado</h1>
+                <p>Olá, <strong>{{ user.username }}</strong>! Gerencie entradas de lotes e expedição de pedidos.</p>
+            </div>
+            <a href="{% url 'logout_usuario' %}" class="button-sair">Sair do Sistema</a>
+        </header>
 
-    <p class="saudacao">Olá, <strong>{{ user.username }}</strong>! Escolha uma opção abaixo:</p>
+        <h3 class="titulo-secao-painel">Resumo do Almoxarifado</h3>
+        <div class="dashboard-grid">
+            <div class="kpi-card {% if kpi_aguardando_envio > 0 %}kpi-alerta{% else %}kpi-sucesso{% endif %}">
+                <span class="kpi-label">Pedidos para Envio</span>
+                <strong class="kpi-valor">{{ kpi_aguardando_envio }}</strong>
+                <span class="kpi-sub">Aprovados aguardando separação</span>
+            </div>
+            <div class="kpi-card {% if kpi_sem_estoque > 0 %}kpi-perigo{% else %}kpi-sucesso{% endif %}">
+                <span class="kpi-label">Produtos Esgotados</span>
+                <strong class="kpi-valor">{{ kpi_sem_estoque }}</strong>
+                <span class="kpi-sub">Itens ativos com saldo zero</span>
+            </div>
+            <div class="kpi-card {% if kpi_lotes_alerta > 0 %}kpi-alerta{% else %}kpi-sucesso{% endif %}">
+                <span class="kpi-label">Atenção à Validade</span>
+                <strong class="kpi-valor">{{ kpi_lotes_alerta }}</strong>
+                <span class="kpi-sub">Lotes vencidos ou vencendo em 30d</span>
+            </div>
+            <div class="kpi-card kpi-sucesso">
+                <span class="kpi-label">Pedidos Despachados</span>
+                <strong class="kpi-valor">{{ kpi_entregues }}</strong>
+                <span class="kpi-sub">Entregas concluídas</span>
+            </div>
+        </div>
 
-    <div class="menu-grid">
-        <a href="{% url 'listar_tipos_produto' %}" class="menu-card card-estoque">
-            <span class="card-icon">📦</span>
-            <h2>Catálogo e Estoque</h2>
-            <p>Consulte todos os produtos, verifique saldos e dê baixa em lotes atuais.</p>
-        </a>
-        
-        <a href="{% url 'listar_pedidos_envio' %}" class="menu-card card-destaque">
-            <span class="card-icon">🚚</span>
-            <h2>Pedidos para Envio</h2>
-            <p>Separe os pedidos aprovados e dê baixa no estoque para entrega.</p>
-        </a>
-    </div>
+        <h3 class="titulo-secao-painel">Operações de Estoque</h3>
+        <div class="menu-grid">
+            <a href="{% url 'listar_pedidos_envio' %}" class="menu-card card-destaque">
+                <span class="card-icon">🚚</span>
+                <h2>Pedidos para Envio ({{ kpi_aguardando_envio }})</h2>
+                <p>Separe os itens dos pedidos aprovados e confirme o despacho com baixa automática.</p>
+            </a>
 
-    <div class="menu-rodape">
-        <a href="{% url 'logout_usuario' %}" class="button-sair">Sair do Sistema</a>
+            <a href="{% url 'listar_tipos_produto' %}" class="menu-card card-estoque">
+                <span class="card-icon">📦</span>
+                <h2>Gerenciar Catálogo e Lotes</h2>
+                <p>Cadastre novos produtos, registre entrada de lotes e realize ajustes ou baixas manuais.</p>
+            </a>
+
+            <a href="{% url 'historico_pedidos' %}" class="menu-card card-consulta">
+                <span class="card-icon">🕒</span>
+                <h2>Histórico de Envios</h2>
+                <p>Consulte todos os pedidos já despachados ou analisados no sistema.</p>
+            </a>
+        </div>
     </div>
 </body>
 </html>

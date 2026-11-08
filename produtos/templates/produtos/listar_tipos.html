@@ -1,61 +1,142 @@
 {% load static %}
 <!DOCTYPE html>
-
+<html lang="pt-br">
 <head>
-    <title>Tipos de Produtos</title>
+    <meta charset="UTF-8">
+    <title>Catálogo e Estoque de Produtos | SEMAE</title>
     <link rel="stylesheet" href="{% static 'produtos/estoque_lista.css' %}">
 </head>
-
 <body>
-    <h1>Produtos no Estoque</h1>
+    <div class="estoque-container">
+        {% if messages %}
+            <div style="margin-bottom: 20px;">
+                {% for message in messages %}
+                    <div style="padding: 12px 16px; border-radius: 8px; margin-bottom: 8px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
 
-    <div class="header-links">
-        <a href="{% url 'menu_principal' %}">Voltar para o Menu</a>
-        <a href="{% url 'cadastrar_tipo_produto' %}">Novo Produto</a>
+        <header class="topo-estoque">
+            <div class="topo-titulo">
+                <h1>Catálogo de Produtos no Estoque</h1>
+                <p>Consulte saldos totais e gerencie os lotes de cada produto cadastrado.</p>
+            </div>
+            <div class="topo-acoes">
+                <a href="{% url 'menu_principal' %}" class="btn-topo btn-voltar-menu">← Voltar ao Menu</a>
+                {% if request.user.is_estoquista %}
+                    <a href="{% url 'cadastrar_tipo_produto' %}" class="btn-topo btn-novo-produto">+ Novo Produto</a>
+                {% endif %}
+            </div>
+        </header>
+
+        <form method="get" class="filtros-card">
+            <div class="filtro-grupo busca">
+                <label for="id_buscar">Buscar Produto</label>
+                <input type="text" id="id_buscar" name="buscar" placeholder="Digite o nome do produto..." value="{{ busca }}">
+            </div>
+
+            <div class="filtro-grupo">
+                <label for="id_tipo">Categoria</label>
+                <select id="id_tipo" name="tipo">
+                    <option value="TODOS" {% if tipo_selecionado == "TODOS" %}selected{% endif %}>Todas as Categorias</option>
+                    {% for valor, label in tipos %}
+                        <option value="{{ valor }}" {% if tipo_selecionado == valor %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filtro-grupo">
+                <label for="id_ordem">Ordenar por</label>
+                <select id="id_ordem" name="ordem">
+                    <option value="nome" {% if ordem == "nome" %}selected{% endif %}>Nome (A-Z)</option>
+                    <option value="estoque_desc" {% if ordem == "estoque_desc" %}selected{% endif %}>Maior Estoque</option>
+                    <option value="estoque_asc" {% if ordem == "estoque_asc" %}selected{% endif %}>Menor Estoque</option>
+                </select>
+            </div>
+
+            <div class="filtro-grupo">
+                <label for="id_ativo">Situação</label>
+                <select id="id_ativo" name="ativo">
+                    <option value="True" {% if ativo == "True" or not ativo %}selected{% endif %}>Ativos</option>
+                    <option value="False" {% if ativo == "False" %}selected{% endif %}>Arquivados</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn-filtrar">Filtrar</button>
+        </form>
+
+        <div class="tabela-estoque-wrapper">
+            <table class="tabela-estoque">
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Categoria</th>
+                        <th>Origem</th>
+                        <th>Unid. de Medida</th>
+                        <th>Saldo Total</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for produto in tipos_produto %}
+                    <tr>
+                        <td>
+                            <strong>{{ produto.nome }}</strong>
+                            {% if not produto.ativo %}
+                                <span class="badge-cat" style="background:#ffcdd2; color:#b71c1c;">Arquivado</span>
+                            {% endif %}
+                        </td>
+                        <td><span class="badge-cat">{{ produto.get_tipo_display }}</span></td>
+                        <td>
+                            {% if produto.tipo == 'ALIMENTO' %}
+                                <span class="badge-cat {% if produto.origem_compra == 'AGRICULTURA' %}badge-origem-agri{% endif %}">
+                                    {{ produto.get_origem_compra_display }}
+                                </span>
+                            {% else %}
+                                <span style="color: #adb5bd;">—</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ produto.get_unidade_medida_display }}</td>
+                        <td>
+                            {% if produto.total_estoque > 0 %}
+                                <span class="badge-saldo saldo-positivo">
+                                    {{ produto.total_estoque }} {% if produto.unidade_medida != 'NA' %}{{ produto.unidade_medida }}{% else %}un.{% endif %}
+                                </span>
+                                <small style="color: #6c757d; margin-left: 4px;">({{ produto.total_lotes }} lote{{ produto.total_lotes|pluralize }})</small>
+                            {% else %}
+                                <span class="badge-saldo saldo-zerado">Sem estoque (0)</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="acoes-grupo">
+                                {% if produto.ativo %}
+                                    <a href="{% url 'listar_lotes' produto.id %}" class="btn-tabela btn-lotes">
+                                        Ver Lotes ({{ produto.lotes.count }})
+                                    </a>
+                                    {% if request.user.is_estoquista %}
+                                        <a href="{% url 'editar_tipo_produto' produto.id %}" class="btn-tabela btn-editar">Editar</a>
+                                        <a href="{% url 'excluir_tipo_produto' produto.id %}" class="btn-tabela btn-arquivar">Arquivar</a>
+                                    {% endif %}
+                                {% else %}
+                                    {% if request.user.is_estoquista %}
+                                        <a href="{% url 'reativar_tipo_produto' produto.id %}" class="btn-tabela btn-add">Reativar Produto</a>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 30px; color: #6c757d;">
+                            Nenhum produto encontrado para os filtros selecionados.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-
-    <form method="get">
-        <input type="text" name="buscar" placeholder="Buscar por nome" value="{{ busca }}">
-
-        <select name="tipo">
-            <option value="TODOS" {% if tipo_selecionado|stringformat:"s" == "TODOS" %}selected{% endif %}>Todos</option>
-
-            {% for valor, label in tipos %}
-            <option value="{{ valor }}" {% if tipo_selecionado == valor %}selected{% endif %}>{{ label }}</option>
-            {% endfor %}
-        </select>
-
-        <select name="ordem">
-            <option value="TODOS" {% if ordem == "TODOS" %}selected{% endif %}>-- Ordenar por --</option>
-            <option value="nome" {% if ordem == "nome" %}selected{% endif %}>Nome (A-Z)</option>
-        </select>
-
-        <select name="ativo">
-            <option value="True" {% if ativo == "True" or not ativo %}selected{% endif %}>Ativo</option>
-            <option value="False" {% if ativo == "False" %}selected{% endif %}>Arquivado</option>
-        </select>
-
-        <button type="submit">Filtrar</button>
-    </form>
-
-    <ul>
-        {% for tipo_produto in tipos_produto %}
-        <li>
-            <strong>{{ tipo_produto.nome }}</strong> ({{ tipo_produto.tipo }}) -
-            {% if not tipo_produto.ativo %}
-                <a href="{% url 'reativar_tipo_produto' tipo_produto.id %}">Reativar</a>
-            {% endif %}
-
-            {% if tipo_produto.ativo %}
-                <a href="{% url 'listar_lotes' tipo_produto.id %}">Ver Lotes</a>
-                <a href="{% url 'editar_tipo_produto' tipo_produto.id %}">Editar</a>
-                <a href="{% url 'excluir_tipo_produto' tipo_produto.id %}">Excluir</a>
-            {% endif %}
-        </li>
-        {% empty %}
-        <li>Nenhum tipo de produto cadastrado.</li>
-        {% endfor %}
-    </ul>
-
 </body>
 </html>

@@ -1,76 +1,394 @@
+* {
+    box-sizing: border-box;
+}
+
 body {
-  font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
-  margin: 0;
-  padding: 20px;
-  background-color: #f4f4f4;
-  color: #333333;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 25px;
+    background-color: #f4f6f9;
+    color: #333333;
 }
 
-h1 {
-  color: #004d99;
-  border-bottom: 2px solid #cccccc;
-  padding-bottom: 10px;
-  margin-bottom: 20px;
-}
-.header-links a {
-  margin-right: 15px;
-  text-decoration: none;
-  color: #007bff;
-  font-weight: bold;
+.estoque-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
 }
 
-form {
-  display: flex;
-  background: #ffffff;
-  align-items: center;
-  padding: 15px;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  margin-top: 20px;
-  margin-bottom: 20px;
-  gap: 10px;
+.topo-estoque {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    border-bottom: 2px solid #e9ecef;
+    padding-bottom: 20px;
+    margin-bottom: 25px;
 }
 
-input[type="text"],
-select {
-  padding: 8px;
-  border: 1px solid #cccccc;
-  border-radius: 4px;
+.topo-titulo h1 {
+    color: #004d99;
+    margin: 0 0 5px 0;
+    font-size: 1.8rem;
+    border: none;
+    padding: 0;
 }
 
-button[type="submit"] {
-  padding: 8px 15px;
-  background-color: #28a745;
-  color: #ffffff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+.topo-titulo p {
+    margin: 0;
+    color: #6c757d;
+    font-size: 0.95rem;
 }
 
-button[type="submit"]:hover {
-  background-color: #218838;
+.topo-acoes {
+    display: flex;
+    gap: 12px;
+    align-items: center;
 }
 
-ul {
-  list-style: none;
-  padding: 0;
+.btn-topo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: all 0.2s;
 }
 
-ul li {
-  background: #ffffff;
-  padding: 12px;
-  margin-bottom: 8px;
-  border-radius: 4px;
-  border-left: 5px solid #007bff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+.btn-voltar-menu {
+    background-color: #e9ecef;
+    color: #495057;
 }
 
-ul li a {
-  margin-left: 15px;
-  text-decoration: none;
-  color: #007bff;
+.btn-voltar-menu:hover {
+    background-color: #dee2e6;
+    color: #212529;
 }
 
-ul li a:hover {
-  text-decoration: underline;
+.btn-novo-produto {
+    background-color: #28a745;
+    color: #ffffff;
+}
+
+.btn-novo-produto:hover {
+    background-color: #218838;
+}
+
+/* Barra de Filtros */
+.filtros-card {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    background: #f8f9fa;
+    padding: 16px;
+    border-radius: 10px;
+    border: 1px solid #e9ecef;
+    margin-bottom: 25px;
+    align-items: flex-end;
+}
+
+.filtro-grupo {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex: 1;
+    min-width: 170px;
+}
+
+.filtro-grupo.busca {
+    flex: 2;
+    min-width: 240px;
+}
+
+.filtro-grupo label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #495057;
+    text-transform: uppercase;
+}
+
+.filtro-grupo input,
+.filtro-grupo select {
+    padding: 10px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    background: #ffffff;
+    width: 100%;
+}
+
+.btn-filtrar {
+    padding: 10px 22px;
+    background-color: #004d99;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    height: 40px;
+}
+
+.btn-filtrar:hover {
+    background-color: #003366;
+}
+
+/* Tabela de Estoque e Lotes */
+.tabela-estoque-wrapper {
+    overflow-x: auto;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+}
+
+.tabela-estoque {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+}
+
+.tabela-estoque thead th {
+    background-color: #004d99;
+    color: #ffffff;
+    padding: 14px 16px;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tabela-estoque tbody td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #e9ecef;
+    vertical-align: middle;
+    font-size: 0.95rem;
+}
+
+.tabela-estoque tbody tr:hover {
+    background-color: #f1f7ff;
+}
+
+/* Badges */
+.badge-cat {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    background: #e9ecef;
+    color: #495057;
+}
+
+.badge-origem-agri {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge-saldo {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.saldo-positivo {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+}
+
+.saldo-zerado {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+/* Botões de Ação na Tabela */
+.acoes-grupo {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-tabela {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s;
+}
+
+.btn-lotes {
+    background-color: #0066cc;
+    color: #ffffff;
+}
+.btn-lotes:hover { background-color: #004d99; }
+
+.btn-add {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+}
+.btn-add:hover { background-color: #2e7d32; color: #ffffff; }
+
+.btn-baixa {
+    background-color: #fff3e0;
+    color: #e65100;
+    border: 1px solid #ffe0b2;
+}
+.btn-baixa:hover { background-color: #e65100; color: #ffffff; }
+
+.btn-editar {
+    background-color: #f8f9fa;
+    color: #495057;
+    border: 1px solid #ced4da;
+}
+.btn-editar:hover { background-color: #e2e6ea; }
+
+.btn-arquivar {
+    background-color: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+}
+.btn-arquivar:hover { background-color: #c62828; color: #ffffff; }
+
+/* Cards de Resumo de Lotes */
+.resumo-lotes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 25px;
+}
+
+.resumo-card {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-left: 4px solid #004d99;
+    padding: 15px 20px;
+    border-radius: 8px;
+}
+
+.resumo-card span {
+    display: block;
+    font-size: 0.8rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    font-weight: 600;
+}
+
+.resumo-card strong {
+    font-size: 1.4rem;
+    color: #212529;
+}
+
+/* Badges de Status de Pedido Padronizados */
+.status-badge {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.status-pendente {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+}
+
+.status-aprovado {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-entregue {
+    background-color: #cce5ff;
+    color: #004085;
+    border: 1px solid #b8daff;
+}
+
+.status-rejeitado {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Alertas do Sistema */
+.alerta-msg {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    font-weight: 500;
+}
+
+.alerta-msg.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.alerta-msg.success, .alerta-msg.warning {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+/* Grid de 2 colunas para Detalhes do Pedido */
+.grid-duas-colunas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 20px;
+}
+
+.card-secao {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.card-secao h3 {
+    margin-top: 0;
+    color: #004d99;
+    font-size: 1.1rem;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.card-secao label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+    color: #495057;
+}
+
+.card-secao input,
+.card-secao select,
+.card-secao textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    margin-bottom: 14px;
+    font-size: 0.95rem;
+    background: #ffffff;
+}
+
+@media (max-width: 800px) {
+    .grid-duas-colunas {
+        grid-template-columns: 1fr;
+    }
 }

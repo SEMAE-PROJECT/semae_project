@@ -2,32 +2,65 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <title>Menu da Nutricionista | SEMAE</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="{% static 'usuarios/base.css' %}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel da Nutricionista | SEMAE</title>
     <link rel="stylesheet" href="{% static 'usuarios/menu_principal.css' %}">
 </head>
 <body>
-    <h1>Página Inicial - Nutricionista</h1>
+    <div class="painel-container">
+        <header class="painel-header">
+            <div>
+                <h1>Painel da Nutrição Escolar</h1>
+                <p>Olá, <strong>{{ user.username }}</strong>! Acompanhe os pedidos de alimentação e validade do estoque.</p>
+            </div>
+            <a href="{% url 'logout_usuario' %}" class="button-sair">Sair do Sistema</a>
+        </header>
 
-    <p class="saudacao">Olá, <strong>{{ user.username }}</strong>! Escolha uma opção abaixo:</p>
+        <h3 class="titulo-secao-painel">Indicadores da Nutrição</h3>
+        <div class="dashboard-grid">
+            <div class="kpi-card {% if kpi_pendentes > 0 %}kpi-alerta{% else %}kpi-sucesso{% endif %}">
+                <span class="kpi-label">Aprovações Pendentes</span>
+                <strong class="kpi-valor">{{ kpi_pendentes }}</strong>
+                <span class="kpi-sub">Pedidos de Alimentação/Limpeza</span>
+            </div>
+            <div class="kpi-card kpi-info">
+                <span class="kpi-label">Em Separação (Aprovados)</span>
+                <strong class="kpi-valor">{{ kpi_aprovados }}</strong>
+                <span class="kpi-sub">Aguardando envio pelo Estoquista</span>
+            </div>
+            <div class="kpi-card {% if kpi_lotes_alerta > 0 %}kpi-perigo{% else %}kpi-sucesso{% endif %}">
+                <span class="kpi-label">Alerta de Validade</span>
+                <strong class="kpi-valor">{{ kpi_lotes_alerta }}</strong>
+                <span class="kpi-sub">Lotes vencidos ou vencendo em 30d</span>
+            </div>
+            <div class="kpi-card kpi-sucesso">
+                <span class="kpi-label">Pedidos Entregues</span>
+                <strong class="kpi-valor">{{ kpi_entregues }}</strong>
+                <span class="kpi-sub">Atendidos na sua categoria</span>
+            </div>
+        </div>
 
-    <div class="menu-grid">
-        <a href="{% url 'listar_pedidos_pendentes' %}" class="menu-card card-destaque">
-            <span class="card-icon">📋</span>
-            <h2>Analisar Pedidos Pendentes</h2>
-            <p>Verifique e aprove os pedidos de Alimentação e Limpeza.</p>
-        </a>
+        <h3 class="titulo-secao-painel">Ações Rápidas</h3>
+        <div class="menu-grid">
+            <a href="{% url 'listar_pedidos_pendentes' %}" class="menu-card card-destaque">
+                <span class="card-icon">🍎</span>
+                <h2>Analisar Pedidos ({{ kpi_pendentes }})</h2>
+                <p>Avalie e aprove os pedidos de Alimentação, Limpeza e Solicitações Especiais.</p>
+            </a>
 
-        <a href="{% url 'historico_pedidos' %}" class="menu-card card-consulta">
-            <span class="card-icon">📅</span>
-            <h2>Histórico de Pedidos</h2>
-            <p>Consulte todos os pedidos já processados.</p>
-        </a>
-    </div>
+            <a href="{% url 'listar_tipos_produto' %}" class="menu-card card-estoque">
+                <span class="card-icon">📦</span>
+                <h2>Visualizar Estoque</h2>
+                <p>Consulte os produtos disponíveis no almoxarifado e acompanhe os lotes e validades.</p>
+            </a>
 
-    <div class="menu-rodape">
-        <a href="{% url 'logout_usuario' %}" class="button-sair">Sair do Sistema</a>
+            <a href="{% url 'historico_pedidos' %}" class="menu-card card-consulta">
+                <span class="card-icon">🕒</span>
+                <h2>Histórico de Pedidos</h2>
+                <p>Consulte o registro completo de pedidos já analisados e despachados.</p>
+            </a>
+        </div>
     </div>
 </body>
 </html>

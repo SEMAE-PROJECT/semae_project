@@ -13,13 +13,13 @@
 
     <div class="alerta-perigo">
         <h2>Atenção! Confirmação de Exclusão</h2>
-        <p>Você está prestes a <strong>EXCLUIR PERMANENTEMENTE</strong> o lote a seguir. Esta ação não pode ser desfeita.</p>
+        <p>Você está prestes a <strong>EXCLUIR PERMANENTEMENTE</strong> o lote a seguir. Esta ação <strong>NÃO</strong> pode ser desfeita.</p>
         <p>Confirme os detalhes do lote que será removido:</p>
     </div>
 
     <div class="lote-detalhes-excluir">
         <p>Produto: <strong>{{ lote.tipo_produto.nome }}</strong></p>
-        <p>Quantidade: <strong>{{ lote.quantidade }} unidades</strong></p>
+        <p>Quantidade: <strong>{{ lote.quantidade_pacotes }} unidades</strong></p>
         <p>Data de Validade: {{ lote.data_validade|date:"d/m/Y" }}</p>
     </div>
 

@@ -3,73 +3,115 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Separar Pedido #{{ pedido.id }}</title>
+    <title>Separar Pedido #{{ pedido.id }} | SEMAE</title>
     <link rel="stylesheet" href="{% static 'produtos/estoque_lista.css' %}">
-    <link rel="stylesheet" href="{% static 'produtos/pedidos.css' %}"> 
 </head>
 <body>
-    <h1>Separação do Pedido #{{ pedido.id }} - ({{ pedido.get_categoria_display }})</h1>
+    <div class="estoque-container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alerta-msg {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
 
-    <!-- Contentor das Informações (Grid/Flex) -->
-    <div class="pedido-detalhes-container">
-        <div class="detalhe-info">
-            <p><strong>Solicitante:</strong> {{ pedido.solicitante.username }}</p>
-            <p><strong>Escola/Unidade:</strong> {{ pedido.solicitante.escola.nome_escola|default:"Não informada" }}</p>
-            <p><strong>Data da Solicitação:</strong> {{ pedido.data_pedido|date:"d/m/Y" }}</p>
-            <p><strong>Status Atual:</strong> <span class="status-{{ pedido.status|lower }}">{{ pedido.get_status_display }}</span></p>
-        </div>
-        
-        <div class="itens-solicitados-bloco">
-            <h3>📦 Itens de Estoque (Debitam no Sistema):</h3>
-            {% if pedido.itens.all %}
-                <ul class="lista-itens" style="list-style: none; padding: 0;">
-                    {% for item in pedido.itens.all %}
-                        <li style="display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding: 10px 0; align-items: center;">
-                            <span>
-                                <span class="item-quantidade" style="font-weight: bold; color: #d9534f; font-size: 1.1em;">{{ item.quantidade }} {{ item.produto.unidade_medida }}</span> de 
-                                <span class="item-nome" style="font-size: 1.1em;">{{ item.produto.nome }}</span>
-                            </span>
-                            <input type="checkbox" style="transform: scale(1.5); cursor: pointer;" title="Marque ao colocar na caixa">
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p>Nenhum item de estoque padrão.</p>
-            {% endif %}
-            
-            <hr style="margin: 20px 0;">
-            
-            <h3>⭐ Itens Especiais (Compras Diretas / Não Debitam):</h3>
-            {% if pedido.itens_especiais.all %}
-                <ul class="lista-itens" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border: 1px solid #ffeeba; list-style: none;">
-                    {% for especial in pedido.itens_especiais.all %}
-                        <li style="display: flex; justify-content: space-between; border-bottom: 1px solid #ffeeba; padding: 10px 0; align-items: center;">
-                            <span>
-                                <span class="item-quantidade" style="font-weight: bold; font-size: 1.1em;">{{ especial.quantidade }} {{ especial.unidade }}</span> de 
-                                <span class="item-nome" style="font-size: 1.1em;">{{ especial.descricao }}</span>
-                            </span>
-                            <input type="checkbox" style="transform: scale(1.5); cursor: pointer;" title="Marque ao colocar na caixa">
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p>Nenhuma solicitação especial registada.</p>
-            {% endif %}
-        </div>
-    </div>
-        
-    <!-- Bloco de Ação (Fora do Contentor Principal) -->
-    <div class="acoes-pedido" style="margin-top: 30px; padding: 20px; background: #e9ecef; border-radius: 8px; text-align: center; max-width: 900px; margin-left: auto; margin-right: auto;">
-        <h3>Finalizar e Despachar</h3>
-        <p>Ao clicar abaixo, o sistema debitará automaticamente as quantidades do stock e marcará o pedido como <strong>Entregue</strong>.</p>
-        <form action="{% url 'despachar_pedido' pedido.id %}" method="post" onsubmit="return confirm('ATENÇÃO: Já separou todos os itens fisicamente? Esta ação debitará o stock de forma irreversível.');">
+        <header class="topo-estoque">
+            <div class="topo-titulo">
+                <h1>Separação do Pedido #{{ pedido.id }} ({{ pedido.get_categoria_display }})</h1>
+                <p>
+                    Escola: <strong>{{ pedido.solicitante.escola.nome_escola|default:pedido.solicitante.username }}</strong> |
+                    Data: <strong>{{ pedido.data_pedido|date:"d/m/Y H:i" }}</strong>
+                </p>
+            </div>
+            <div class="topo-acoes">
+                <a href="{% url 'listar_pedidos_envio' %}" class="btn-topo btn-voltar-menu">← Voltar à Fila de Envio</a>
+                <a href="{% url 'menu_principal' %}" class="btn-topo btn-voltar-menu">Menu Inicial</a>
+            </div>
+        </header>
+
+        <form action="{% url 'despachar_pedido' pedido.id %}" method="post">
             {% csrf_token %}
-            <button type="submit" class="btn-aprovar" style="background-color: #28a745; width: 100%; font-size: 1.2em; padding: 15px; cursor: pointer; border: none; color: white; border-radius: 5px;">Confirmar Separação e Despachar</button>
+
+            {% if pedido.itens.all %}
+            <div class="card-secao" style="margin-bottom: 20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #dee2e6; padding-bottom:10px; margin-bottom:15px;">
+                    <h3 style="margin:0; border:none; padding:0;">📦 Itens de Estoque (Baixa Automática nos Lotes)</h3>
+                    <button type="button" onclick="marcarTodosPendentes()" class="btn-tabela btn-editar" style="cursor:pointer; border:1px solid #ced4da;">
+                        Marcar Todos Pendentes
+                    </button>
+                </div>
+
+                {% for item in pedido.itens.all %}
+                    {% if item.entregue %}
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 15px; background:#e8f5e9; border:1px solid #c8e6c9; border-radius:8px; margin-bottom:8px; opacity: 0.85;">
+                        <span>
+                            <strong style="color:#2e7d32; text-decoration: line-through;">
+                                {{ item.quantidade }} {% if item.produto.unidade_medida != 'NA' %}{{ item.produto.unidade_medida }}{% else %}UN{% endif %}
+                            </strong>
+                            — <span style="text-decoration: line-through;">{{ item.produto.nome }}</span>
+                        </span>
+                        <span class="status-badge status-aprovado">✓ Já Baixado e Separado</span>
+                    </div>
+                    {% else %}
+                    <label style="display:flex; justify-content:space-between; align-items:center; padding:12px 15px; background:#fff; border:1px solid #ced4da; border-radius:8px; margin-bottom:8px; cursor:pointer;">
+                        <span>
+                            <strong style="color:#004d99;">
+                                {{ item.quantidade }} {% if item.produto.unidade_medida != 'NA' %}{{ item.produto.unidade_medida }}{% else %}UN{% endif %}
+                            </strong>
+                            — {{ item.produto.nome }}
+                        </span>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <small style="color:#6c757d;">Marcar para dar baixa</small>
+                            <input type="checkbox" name="itens_estoque" value="{{ item.id }}" class="check-item-pendente" style="width:20px; height:20px; margin:0; cursor:pointer;">
+                        </div>
+                    </label>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if pedido.itens_especiais.all %}
+            <div class="card-secao" style="background:#fffdf5; border-color:#ffeeba; margin-bottom: 20px;">
+                <h3 style="color:#856404;">📋 Solicitações Especiais (Fora do Estoque)</h3>
+                {% for especial in pedido.itens_especiais.all %}
+                    {% if especial.entregue %}
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 15px; background:#e8f5e9; border:1px solid #c8e6c9; border-radius:8px; margin-bottom:8px;">
+                        <span style="text-decoration: line-through;">
+                            <strong>{{ especial.quantidade }} {{ especial.unidade }}</strong> — {{ especial.descricao }}
+                        </span>
+                        <span class="status-badge status-aprovado">✓ Já Entregue</span>
+                    </div>
+                    {% else %}
+                    <label style="display:flex; justify-content:space-between; align-items:center; padding:12px 15px; background:#fff; border:1px solid #ffeeba; border-radius:8px; margin-bottom:8px; cursor:pointer;">
+                        <span>
+                            <strong>{{ especial.quantidade }} {{ especial.unidade }}</strong> — {{ especial.descricao }}
+                        </span>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <small style="color:#856404;">Marcar como entregue</small>
+                            <input type="checkbox" name="itens_especiais" value="{{ especial.id }}" class="check-item-pendente" style="width:20px; height:20px; margin:0; cursor:pointer;">
+                        </div>
+                    </label>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; background:#f8f9fa; padding:18px 22px; border-radius:10px; border:1px solid #e9ecef;">
+                <div style="color:#495057; font-size:0.92rem;">
+                    <strong>Como funciona:</strong> Apenas os itens marcados acima terão baixa registrada agora. Se ainda faltarem itens, o pedido continuará nesta fila até que todos sejam entregues.
+                </div>
+                <button type="submit" class="btn-topo btn-novo-produto" style="border:none; cursor:pointer; font-size:1rem; padding:12px 26px;">
+                    🚚 Dar Baixa e Salvar Itens Marcados
+                </button>
+            </div>
         </form>
     </div>
 
-    <div class="rodape-link" style="margin-top: 20px; text-align: center;">
-        <a href="{% url 'listar_pedidos_envio' %}" class="link-voltar">← Voltar para a lista</a>
-    </div>
+    <script>
+        function marcarTodosPendentes() {
+            const checks = document.querySelectorAll('.check-item-pendente');
+            const todosMarcados = Array.from(checks).every(c => c.checked);
+            checks.forEach(c => c.checked = !todosMarcados);
+        }
+    </script>
 </body>
 </html>

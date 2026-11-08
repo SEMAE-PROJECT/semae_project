@@ -3,49 +3,61 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Estoque Disponível | Diretor</title>
+    <title>Estoque Disponível | SEMAE</title>
     <link rel="stylesheet" href="{% static 'produtos/estoque_lista.css' %}">
-    <link rel="stylesheet" href="{% static 'produtos/estoque_diretor.css' %}">
-    <link rel="stylesheet" href="{% static 'produtos/pedidos.css'%}">
 </head>
 <body>
-    <div class="container-principal">
-        <h1>Estoque Disponível para Solicitação</h1>
-        <p>Aqui está a lista de todos os tipos de produto e suas quantidades totais em estoque (soma de todos os lotes).</p>
+    <div class="estoque-container">
+        <header class="topo-estoque">
+            <div class="topo-titulo">
+                <h1>Estoque Disponível no Almoxarifado</h1>
+                <p>Consulte os itens disponíveis antes de registrar sua solicitação.</p>
+            </div>
+            <div class="topo-acoes">
+                <a href="{% url 'menu_principal' %}" class="btn-topo btn-voltar-menu">← Voltar ao Menu</a>
+            </div>
+        </header>
 
-        <table class="tabela-pedidos">
-            <thead>
-                <tr>
-                    <th>Produto</th>
-                    <th class="col-tipo">Tipo</th>
-                    <th class="col-estoque-total">Estoque Total</th>
-                    <th class="col-status-solicitacao">Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for produto in produtos %}
-                <tr>
-                    <td class="col-produto">{{ produto.nome }}</td>
-                    <td class="col-tipo">{{ produto.get_tipo_display }}</td>
-                    <td class="col-estoque-total">{{ produto.total_estoque|default:"0" }}</td>
-                    <td class="col-status-solicitacao">
-                        {% if produto.total_estoque > 0 %}
-                            <span class="status-disponivel">Disponível</span>
-                        {% else %}
-                            <span class="status-indisponivel">Indisponível</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="4" class="tabela-vazia">Nenhum tipo de produto cadastrado no momento.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        
-        <div class="rodape-link">
-            <a href="{% url 'menu_diretor' %}" class="link-voltar">← Voltar ao Menu</a>
+        <div class="tabela-estoque-wrapper">
+            <table class="tabela-estoque">
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Categoria</th>
+                        <th>Unid. de Medida</th>
+                        <th>Saldo Total</th>
+                        <th>Disponibilidade</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for produto in produtos %}
+                    <tr>
+                        <td><strong>{{ produto.nome }}</strong></td>
+                        <td><span class="badge-cat">{{ produto.get_tipo_display }}</span></td>
+                        <td>{{ produto.get_unidade_medida_display }}</td>
+                        <td>
+                            <strong>
+                                {{ produto.total_estoque|default:"0" }}
+                                {% if produto.unidade_medida != 'NA' %}{{ produto.unidade_medida }}{% else %}UN{% endif %}
+                            </strong>
+                        </td>
+                        <td>
+                            {% if produto.total_estoque > 0 %}
+                                <span class="status-badge status-aprovado">Disponível</span>
+                            {% else %}
+                                <span class="status-badge status-rejeitado">Indisponível</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 30px; color: #6c757d;">
+                            Nenhum produto cadastrado no momento.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </body>

@@ -3,78 +3,108 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Analisar Pedido #{{ pedido.id }}</title>
+    <title>Pedido #{{ pedido.id }} | SEMAE</title>
     <link rel="stylesheet" href="{% static 'produtos/estoque_lista.css' %}">
-    <link rel="stylesheet" href="{% static 'produtos/pedidos.css' %}"> 
 </head>
 <body>
-    <h1>Analisando Pedido #{{ pedido.id }} - ({{ pedido.get_categoria_display }})</h1>
-    
-    <div class="pedido-detalhes-container">
-        <div class="detalhe-info">
-            <p><strong>Solicitante:</strong> {{ pedido.solicitante.username }}</p>
-            <p><strong>Data da Solicitação:</strong> {{ pedido.data_pedido|date:"d/m/Y" }}</p>
-            <p><strong>Status:</strong> <span class="status-{{ pedido.status|lower }}">{{ pedido.get_status_display }}</span></p>
-        </div>
-        
-        <div class="itens-solicitados-bloco">
-            <h3>Itens Padrão Solicitados:</h3>
-            {% if pedido.itens.all %}
-                <ul class="lista-itens">
-                    {% for item in pedido.itens.all %}
-                        <li>
-                            <span class="item-quantidade">{{ item.quantidade }} x</span> 
-                            <span class="item-nome">{{ item.produto.nome }}</span>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p>Nenhum item de estoque padrão solicitado.</p>
-            {% endif %}
-            
-            <hr style="margin: 15px 0;">
-            
-            <h3>Itens Especiais Solicitados:</h3>
-            {% if pedido.itens_especiais.all %}
-                <ul class="lista-itens" style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border: 1px solid #ffeeba;">
-                    {% for especial in pedido.itens_especiais.all %}
-                        <li>
-                            <span class="item-quantidade">{{ especial.quantidade }} {{ especial.unidade }} de </span> 
-                            <span class="item-nome">{{ especial.descricao }}</span>
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% else %}
-                <p>Nenhuma solicitação especial registrada.</p>
-            {% endif %}
-        </div>
-        
-        <!-- Botão de Aprovação com Confirmação -->
-        <form action="{% url 'aprovar_pedido' pedido.id %}" method="post" style="display:inline;" onsubmit="return confirm('Tem certeza que deseja APROVAR este pedido? O estoque será debitado automaticamente.');">
-            {% csrf_token %}
-            <button type="submit" class="btn-aprovar">Aprovar Pedido</button>
-        </form>
-    </div>
-    
-    <hr class="divisor-acoes">
-    
-    <div class="acoes-pedido">
-        <div class="area-rejeicao">
-            <h3>Rejeitar Pedido</h3>
-            <p>Explique o motivo da rejeição:</p>
-            
-            <!-- Botão de Rejeição com Confirmação -->
-            <form action="{% url 'rejeitar_pedido' pedido.id %}" method="post" onsubmit="return confirm('Tem certeza que deseja REJEITAR este pedido?');">
-                {% csrf_token %}
-                <textarea name="justificativa" rows="3" placeholder="Ex: Estoque insuficiente de arroz para esta semana..." required></textarea>
-                <br>
-                <button type="submit" class="btn-rejeitar">Confirmar Rejeição</button>
-            </form>
-        </div>
-    </div>
+    <div class="estoque-container">
+        <header class="topo-estoque">
+            <div class="topo-titulo">
+                <h1>Análise do Pedido #{{ pedido.id }} ({{ pedido.get_categoria_display }})</h1>
+                <p>
+                    Escola: <strong>{{ pedido.solicitante.escola.nome_escola|default:pedido.solicitante.username }}</strong> |
+                    Data: <strong>{{ pedido.data_pedido|date:"d/m/Y H:i" }}</strong> |
+                    Status: <span class="status-badge status-{{ pedido.status|lower }}">{{ pedido.get_status_display }}</span>
+                </p>
+            </div>
+            <div class="topo-acoes">
+                {% if pedido.status == 'PENDENTE' %}
+                    <a href="{% url 'listar_pedidos_pendentes' %}" class="btn-topo btn-voltar-menu">← Voltar aos Pendentes</a>
+                {% else %}
+                    <a href="{% url 'historico_pedidos' %}" class="btn-topo btn-voltar-menu">← Voltar ao Histórico</a>
+                {% endif %}
+                <a href="{% url 'menu_principal' %}" class="btn-topo btn-voltar-menu">Menu Inicial</a>
+            </div>
+        </header>
 
-    <div class="rodape-link">
-        <a href="{% url 'listar_pedidos_pendentes' %}" class="link-voltar">← Voltar</a>
+        {% if pedido.status == 'REJEITADO' and pedido.justificativa_rejeicao %}
+            <div class="alerta-msg error">
+                <strong>Motivo da Rejeição:</strong> "{{ pedido.justificativa_rejeicao }}"
+            </div>
+        {% endif %}
+
+        {% if pedido.itens.all %}
+        <div class="card-secao" style="margin-bottom: 20px;">
+            <h3>📦 Itens Solicitados do Estoque</h3>
+            <ul style="margin:0; padding-left:18px; line-height:1.9;">
+                {% for item in pedido.itens.all %}
+                    <li>
+                        <strong>{{ item.quantidade }} {% if item.produto.unidade_medida != 'NA' %}{{ item.produto.unidade_medida }}{% else %}UN{% endif %}</strong>
+                        — {{ item.produto.nome }}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if pedido.itens_especiais.all %}
+        <div class="card-secao" style="background:#fffdf5; border-color:#ffeeba; margin-bottom: 20px;">
+            <h3 style="color:#856404;">📋 Solicitações Especiais (Fora do Estoque)</h3>
+            <ul style="margin:0; padding-left:18px; line-height:1.9;">
+                {% for especial in pedido.itens_especiais.all %}
+                    <li><strong>{{ especial.quantidade }} {{ especial.unidade }}</strong> — {{ especial.descricao }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if pedido.status == 'PENDENTE' and not request.user.is_estoquista %}
+        <div style="border-top: 2px solid #e9ecef; padding-top: 20px; margin-top: 25px;">
+            <div style="display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap;">
+                <button type="button" onclick="alternarCaixaRejeicao()" class="btn-topo" style="background:#dc3545; color:#fff; border:none; cursor:pointer; padding:12px 24px; font-size:0.98rem;">
+                    ✕ Rejeitar Pedido
+                </button>
+
+                <form action="{% url 'aprovar_pedido' pedido.id %}" method="post" style="margin:0;" onsubmit="return confirm('Confirma a APROVAÇÃO deste pedido?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-topo btn-novo-produto" style="border:none; cursor:pointer; padding:12px 28px; font-size:0.98rem;">
+                        ✓ Aprovar Pedido
+                    </button>
+                </form>
+            </div>
+
+            <!-- Caixa de Rejeição oculta até clicar no botão Rejeitar -->
+            <div id="caixa-rejeicao" class="card-secao" style="display: none; background:#fff5f5; border-color:#ffcdd2; margin-top: 18px;">
+                <h3 style="color:#c62828;">Justificativa da Rejeição</h3>
+                <form action="{% url 'rejeitar_pedido' pedido.id %}" method="post">
+                    {% csrf_token %}
+                    <label>Explique ao Diretor o motivo da rejeição deste pedido:</label>
+                    <textarea id="input-justificativa" name="justificativa" rows="3" placeholder="Ex: Quantidade acima da cota mensal ou item indisponível..." required></textarea>
+                    <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                        <button type="button" onclick="alternarCaixaRejeicao()" class="btn-topo btn-voltar-menu" style="border:none; cursor:pointer;">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="btn-topo" style="background:#c82333; color:#fff; border:none; cursor:pointer;">
+                            Confirmar Rejeição
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <script>
+            function alternarCaixaRejeicao() {
+                const caixa = document.getElementById('caixa-rejeicao');
+                const input = document.getElementById('input-justificativa');
+                if (caixa.style.display === 'none') {
+                    caixa.style.display = 'block';
+                    input.focus();
+                } else {
+                    caixa.style.display = 'none';
+                }
+            }
+        </script>
+        {% endif %}
     </div>
 </body>
 </html>

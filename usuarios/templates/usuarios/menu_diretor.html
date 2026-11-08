@@ -1,42 +1,72 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-    <title>Menu do Diretor | SEMAE</title>
-    <link rel="stylesheet" href="{% static 'usuarios/base.css' %}">
-    <link rel="stylesheet" href="{% static 'usuarios/menu_principal.css' %}"> 
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Diretor | SEMAE</title>
+    <link rel="stylesheet" href="{% static 'usuarios/menu_principal.css' %}">
 </head>
 <body>
-    <h1>Página Inicial - Diretor</h1>
-    
-    {% if messages %}
-        <ul class="messages">
-            </ul>
-    {% endif %}
-    
-    <p class="saudacao">Bem-vindo(a), <strong>{{ user.username }}</strong>! Escolha uma opção abaixo:</p>
-    
-    <div class="menu-grid">
-        
-        <a href="{% url 'criar_pedido' %}" class="menu-card card-destaque">
-            <span class="card-icon">📝</span> <h2>Fazer Nova Solicitação de Pedido</h2>
-            <p>Inicie o processo para solicitar novos itens de estoque para sua escola.</p>
-        </a>
-        
-        <a href="{% url 'estoque_disponivel' %}" class="menu-card card-estoque">
-            <span class="card-icon">🔎</span> <h2>Ver Estoque Disponível</h2>
-            <p>Consulte a lista de produtos que podem ser solicitados ao almoxarifado.</p>
-        </a>
+    <div class="painel-container">
+        <header class="painel-header">
+            <div>
+                <h1>Painel da Direção Escolar</h1>
+                <p>Unidade: <strong>{{ user.escola.nome_escola|default:user.username }}</strong></p>
+            </div>
+            <a href="{% url 'logout_usuario' %}" class="button-sair">Sair do Sistema</a>
+        </header>
 
-        <a href="{% url 'meus_pedidos' %}" class="menu-card card-consulta">
-            <span class="card-icon">📦</span> <h2>Ver Meus Pedidos</h2>
-            <p>Acompanhe o status e histórico de todas as suas solicitações.</p>
-        </a>
+        <h3 class="titulo-secao-painel">Acompanhamento dos Meus Pedidos</h3>
+        <div class="dashboard-grid">
+            <div class="kpi-card kpi-alerta">
+                <span class="kpi-label">Aguardando Análise</span>
+                <strong class="kpi-valor">{{ kpi_pendentes }}</strong>
+                <span class="kpi-sub">Pedidos pendentes de aprovação</span>
+            </div>
+            <div class="kpi-card kpi-info">
+                <span class="kpi-label">Aprovados / Em Separação</span>
+                <strong class="kpi-valor">{{ kpi_aprovados }}</strong>
+                <span class="kpi-sub">Sendo preparados no estoque</span>
+            </div>
+            <div class="kpi-card kpi-sucesso">
+                <span class="kpi-label">Pedidos Entregues</span>
+                <strong class="kpi-valor">{{ kpi_entregues }}</strong>
+                <span class="kpi-sub">Recebidos pela escola</span>
+            </div>
+            <div class="kpi-card {% if kpi_rejeitados > 0 %}kpi-perigo{% endif %}">
+                <span class="kpi-label">Pedidos Rejeitados</span>
+                <strong class="kpi-valor">{{ kpi_rejeitados }}</strong>
+                <span class="kpi-sub">Com justificativa para revisão</span>
+            </div>
+        </div>
 
-    </div>
+        <h3 class="titulo-secao-painel">Solicitações e Consultas</h3>
+        <div class="menu-grid">
+            <a href="{% url 'criar_pedido' %}?categoria=ALIMENTICIO_LIMPEZA" class="menu-card card-destaque">
+                <span class="card-icon">🍎</span>
+                <h2>Pedir Alimentação e Limpeza</h2>
+                <p>Solicite alimentos, itens de limpeza ou perecíveis especiais para a sua escola.</p>
+            </a>
 
-    <div class="menu-rodape">
-        <a href="{% url 'logout_usuario' %}" class="button-sair">Sair do Sistema</a>
+            <a href="{% url 'criar_pedido' %}?categoria=ESCOLAR" class="menu-card card-estoque">
+                <span class="card-icon">✏️</span>
+                <h2>Pedir Material Escolar</h2>
+                <p>Solicite materiais de expediente e insumos pedagógicos à Secretaria.</p>
+            </a>
+
+            <a href="{% url 'estoque_disponivel' %}" class="menu-card">
+                <span class="card-icon">📦</span>
+                <h2>Consultar Estoque Disponível</h2>
+                <p>Veja a quantidade atual de cada produto disponível no almoxarifado.</p>
+            </a>
+
+            <a href="{% url 'meus_pedidos' %}" class="menu-card card-consulta">
+                <span class="card-icon">📋</span>
+                <h2>Meus Pedidos (Histórico)</h2>
+                <p>Acompanhe seus pedidos em andamento, imprima guias ou veja motivos de rejeição.</p>
+            </a>
+        </div>
     </div>
 </body>
 </html>

@@ -1,97 +1,237 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="pt-br">
-
 <head>
     <meta charset="UTF-8">
-    <title>{% if editar %}Editar Produto{% else %}Novo Produto e Lote{% endif %}</title>
+    <title>{% if editar %}Editar Produto{% else %}Novo Produto{% endif %} | SEMAE</title>
     <link rel="stylesheet" href="{% static 'produtos/estoque_lista.css' %}">
     <link rel="stylesheet" href="{% static 'produtos/cadastra_tipo.css' %}">
 </head>
-
 <body>
-    <h1>{% if editar %}Editar Produto{% else %}Novo Produto e Estoque Inicial{% endif %}</h1>
+    <div class="cadastro-wrapper">
+        <header class="cadastro-header">
+            <h1>{% if editar %}Editar Ficha do Produto{% else %}Cadastrar Novo Produto{% endif %}</h1>
+            <p>
+                {% if editar %}
+                    Altere as informações de identificação deste produto no catálogo.
+                {% else %}
+                    Defina os dados do produto no catálogo e, se desejar, já lance a primeira remessa no estoque.
+                {% endif %}
+            </p>
+        </header>
 
-    <div class="form-container">
-        <!-- Confirmação no submit do form -->
-        <form method="post" onsubmit="return confirm('Confirma os dados informados para este produto e lote?');">
+        <form method="post" id="form-produto">
             {% csrf_token %}
 
-            {% if form.non_field_errors or lote_form.non_field_errors %}
-            <div class="form-group alert-error">
-                <p><strong>Erro no Cadastro:</strong></p>
-                <ul class="errorlist">
-                    {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
-                    {% for error in lote_form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+            {% if form.errors or lote_form.errors %}
+            <div class="alerta-erro-form">
+                <strong>Verifique os campos abaixo:</strong>
+                <ul>
+                    {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+                    {% for field in lote_form %}{% for error in field.errors %}<li>Lote ({{ field.label }}): {{ error }}</li>{% endfor %}{% endfor %}
                 </ul>
             </div>
             {% endif %}
 
-            <div class="form-layout-grid">
+            <div class="passos-grid {% if editar %}modo-edicao{% endif %}">
                 
-                <!-- Coluna de Produto -->
-                <div class="col-principal-fields">
-                    <h2>Dados do Produto</h2>
-                    {% for field in form %}
-                    {% if field.name == 'nome' or field.name == 'tipo' or field.name == 'unidade_medida' or field.name == 'origem_compra' %}
+                <!-- PASSO 1: FICHA DO PRODUTO -->
+                <section class="card-passo">
+                    <div class="passo-titulo">
+                        <span class="passo-badge">1</span>
+                        <div>
+                            <h2>Ficha do Produto (Catálogo)</h2>
+                            <small>Informações fixas sobre o item</small>
+                        </div>
+                    </div>
+
                     <div class="form-group">
-                        <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
-                        {{ field }}
-                        {% if field.errors %}
-                        <ul class="errorlist">
-                            {% for error in field.errors %}<li>{{ error }}</li>{% endfor %}
-                        </ul>
-                        {% endif %}
+                        <label for="{{ form.nome.id_for_label }}">Nome do Produto *</label>
+                        {{ form.nome }}
+                        <small class="dica-campo">Ex: Arroz Branco Tipo 1, Água Sanitária, Papel Sulfite A4</small>
                     </div>
-                    {% endif %}
-                    {% endfor %}
-                    
-                    <div class="rastreamento-box" style="margin-top: 15px;">
-                        <h3>Configurações de Rastreamento (Datas)</h3>
-                        <div class="form-group-checkbox">
-                            <label>{{ form.possui_data_fabricacao }} {{ form.possui_data_fabricacao.label }}</label>
-                            <small class="help-text">Desmarque se não utiliza.</small>
-                        </div>
-                        <div class="form-group-checkbox">
-                            <label>{{ form.possui_data_validade }} {{ form.possui_data_validade.label }}</label>
-                            <small class="help-text">Desmarque se não utiliza.</small>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Coluna de Lote Inicial -->
-                <div class="col-rastreamento-button">
-                    {% if not editar %}
-                    <div class="rastreamento-box" style="background-color: #f1f8ff; border: 1px solid #cce5ff;">
-                        <h2>Estoque Inicial (Lote)</h2>
+                    <div class="linha-2-col">
                         <div class="form-group">
-                            <label>Qtd de Pacotes/Itens:</label>
-                            {{ lote_form.quantidade_pacotes }}
+                            <label for="{{ form.tipo.id_for_label }}">Categoria *</label>
+                            {{ form.tipo }}
                         </div>
-                        <div class="form-group">
-                            <label>Peso/Vol por Pacote (Ex: 1):</label>
-                            {{ lote_form.quantidade_por_pacote }}
-                        </div>
-                        <div class="form-group">
-                            <label>Preço Unitário (R$):</label>
-                            {{ lote_form.preco_unitario }}
-                        </div>
-                        <div class="form-group">
-                            <label>Data de Validade:</label>
-                            {{ lote_form.data_validade }}
+
+                        <div class="form-group" id="grupo-origem">
+                            <label for="{{ form.origem_compra.id_for_label }}">Origem do Alimento *</label>
+                            {{ form.origem_compra }}
                         </div>
                     </div>
-                    {% endif %}
 
-                    <button type="submit" class="button-cadastro" style="margin-top: 20px;">{% if editar %}Salvar Alterações{% else %}Cadastrar Produto e Lote{% endif %}</button>
-                </div>
+                    <div class="form-group">
+                        <label for="{{ form.unidade_medida.id_for_label }}">Como este produto é medido? *</label>
+                        {{ form.unidade_medida }}
+                        <small class="dica-campo" id="dica-unidade">Escolha KG/L para produtos com peso/volume ou Unidades (Un) para itens avulsos.</small>
+                    </div>
+
+                    <div class="box-opcoes-datas">
+                        <span class="titulo-opcoes">Controle de Validade deste Produto:</span>
+                        <label class="checkbox-card">
+                            {{ form.possui_data_validade }}
+                            <div>
+                                <strong>Controlar Data de Validade</strong>
+                                <small>Marque para alimentos, químicos ou itens que vencem.</small>
+                            </div>
+                        </label>
+
+                        <label class="checkbox-card">
+                            {{ form.possui_data_fabricacao }}
+                            <div>
+                                <strong>Exigir Data de Fabricação</strong>
+                                <small>Marque se desejar registrar quando o lote foi fabricado.</small>
+                            </div>
+                        </label>
+                    </div>
+                </section>
+
+                <!-- PASSO 2: ESTOQUE INICIAL (Apenas na criação) -->
+                {% if not editar %}
+                <section class="card-passo card-lote-inicial">
+                    <div class="passo-titulo">
+                        <span class="passo-badge badge-verde">2</span>
+                        <div>
+                            <h2>Entrada de Estoque Inicial</h2>
+                            <small>Primeira remessa física no almoxarifado</small>
+                        </div>
+                    </div>
+
+                    <label class="toggle-lote-box">
+                        <input type="checkbox" id="check-lancar-estoque" checked onchange="atualizarCamposDinamicos()">
+                        <span>Já tenho este produto em mãos para lançar no estoque agora</span>
+                    </label>
+
+                    <div id="bloco-campos-lote">
+                        <div class="linha-2-col">
+                            <div class="form-group">
+                                <label for="{{ lote_form.quantidade_pacotes.id_for_label }}" id="label-qtd-inicial">
+                                    Quantidade Inicial *
+                                </label>
+                                {{ lote_form.quantidade_pacotes }}
+                                <small class="dica-campo">Total disponível neste primeiro lote.</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="{{ lote_form.preco_unitario.id_for_label }}">Preço Unitário (R$)</label>
+                                {{ lote_form.preco_unitario }}
+                                <small class="dica-campo">Valor pago por unidade/pacote/kg.</small>
+                            </div>
+                        </div>
+
+                        <div class="linha-2-col">
+                            <div class="form-group" id="grupo-data-fab">
+                                <label for="{{ lote_form.data_fabricacao.id_for_label }}">Data de Fabricação</label>
+                                {{ lote_form.data_fabricacao }}
+                            </div>
+
+                            <div class="form-group" id="grupo-data-val">
+                                <label for="{{ lote_form.data_validade.id_for_label }}">Data de Validade *</label>
+                                {{ lote_form.data_validade }}
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="{{ lote_form.observacoes.id_for_label }}">Observações do Lote (Opcional)</label>
+                            {{ lote_form.observacoes }}
+                        </div>
+                    </div>
+
+                    <div id="aviso-sem-lote" style="display: none;" class="aviso-sem-estoque">
+                        O produto será cadastrado no catálogo com <strong>saldo 0</strong>. Você poderá adicionar lotes a qualquer momento na lista de produtos.
+                    </div>
+                </section>
+                {% endif %}
+
+            </div>
+
+            <div class="rodape-acoes-form">
+                <a href="{% url 'listar_tipos_produto' %}" class="btn-cancelar-form">← Cancelar e Voltar</a>
+                <button type="submit" class="btn-salvar-form">
+                    {% if editar %}Salvar Alterações{% else %}Concluir Cadastro{% endif %}
+                </button>
             </div>
         </form>
     </div>
 
-    <div class="rodape-link">
-        <a href="{% url 'listar_tipos_produto' %}" class="link-cancelar">Cancelar e Voltar para a Lista</a>
-    </div>
-</body>
+    <script>
+        function atualizarCamposDinamicos() {
+            const selectTipo = document.querySelector('[name="tipo"]');
+            const grupoOrigem = document.getElementById('grupo-origem');
+            const selectOrigem = document.querySelector('[name="origem_compra"]');
 
+            const selectUnidade = document.querySelector('[name="unidade_medida"]');
+            const grupoPeso = document.getElementById('grupo-peso-pacote');
+            const inputPeso = document.querySelector('[name="quantidade_por_pacote"]');
+            const labelPeso = document.getElementById('label-peso-pacote');
+
+            const checkFab = document.querySelector('[name="possui_data_fabricacao"]');
+            const checkVal = document.querySelector('[name="possui_data_validade"]');
+            const grupoDataFab = document.getElementById('grupo-data-fab');
+            const grupoDataVal = document.getElementById('grupo-data-val');
+
+            const checkLancar = document.getElementById('check-lancar-estoque');
+            const blocoLote = document.getElementById('bloco-campos-lote');
+            const avisoSemLote = document.getElementById('aviso-sem-lote');
+            const inputQtdPacotes = document.querySelector('[name="quantidade_pacotes"]');
+
+            // 1. Origem da compra só faz sentido para ALIMENTO
+            if (selectTipo && grupoOrigem) {
+                if (selectTipo.value === 'ALIMENTO') {
+                    grupoOrigem.style.display = 'block';
+                } else {
+                    grupoOrigem.style.display = 'none';
+                    if (selectOrigem) selectOrigem.value = 'COMUM';
+                }
+            }
+
+            // 2. Liga/Desliga bloco de lote inicial
+            if (checkLancar && blocoLote) {
+                if (checkLancar.checked) {
+                    blocoLote.style.display = 'block';
+                    avisoSemLote.style.display = 'none';
+                    if (inputQtdPacotes && (!inputQtdPacotes.value || parseInt(inputQtdPacotes.value) === 0)) {
+                        inputQtdPacotes.value = 1;
+                    }
+                } else {
+                    blocoLote.style.display = 'none';
+                    avisoSemLote.style.display = 'block';
+                    if (inputQtdPacotes) inputQtdPacotes.value = 0;
+                }
+            }
+
+            // 3. Peso/Volume por pacote só aparece para KG, G, L, ML
+            if (selectUnidade && grupoPeso) {
+                const u = selectUnidade.value;
+                if (['KG', 'G', 'L', 'ML'].includes(u)) {
+                    grupoPeso.style.display = 'block';
+                    labelPeso.textContent = `Peso/Volume por pacote (em ${u})`;
+                } else {
+                    grupoPeso.style.display = 'none';
+                    if (inputPeso) inputPeso.value = 1;
+                }
+            }
+
+            // 4. Mostra/Esconde datas de fabricação e validade no lote
+            if (checkFab && grupoDataFab) {
+                grupoDataFab.style.display = checkFab.checked ? 'block' : 'none';
+            }
+            if (checkVal && grupoDataVal) {
+                grupoDataVal.style.display = checkVal.checked ? 'block' : 'none';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const camposGatilho = ['tipo', 'unidade_medida', 'possui_data_fabricacao', 'possui_data_validade'];
+            camposGatilho.forEach(nome => {
+                const el = document.querySelector(`[name="${nome}"]`);
+                if (el) el.addEventListener('change', atualizarCamposDinamicos);
+            });
+            atualizarCamposDinamicos();
+        });
+    </script>
+</body>
 </html>

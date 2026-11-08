@@ -61,9 +61,12 @@
                                 </div>
                             </td>
                             <td>
-                                <span class="badge-cargo {% if u.cargo == 'Secretário' %}secretario{% elif u.cargo == 'Diretor' %}diretor{% elif u.cargo == 'Funcionário' %}funcionario{% else %}outro{% endif %}">
-                                    {{ u.cargo }}
+                                <span class="badge-cargo {% if u.cargo == 'SECRETARIO' %}secretario{% elif u.cargo == 'DIRETOR' %}diretor{% elif u.cargo == 'NUTRICIONISTA' or u.cargo == 'ESTOQUISTA' %}funcionario{% else %}outro{% endif %}">
+                                    {{ u.get_cargo_display }}
                                 </span>
+                                {% if u.cargo == 'DIRETOR' and u.escola %}
+                                    <small style="display: block; color: #6c757d; margin-top: 4px;">🏫 {{ u.escola.nome_escola }}</small>
+                                {% endif %}
                             </td>
                             <td>
                                 <div class="acoes-celula">
@@ -85,7 +88,7 @@
                 <div class="icone-vazio">👤</div>
                 <h3>Nenhum usuário cadastrado</h3>
                 <p>Comece criando seu primeiro usuário clicando no botão acima.</p>
-                <a href="{% url 'criar' %}" class="botao-criar">
+                <a href="{% url 'criar_usuario' %}" class="botao-criar">
                     <span>➕</span>
                     Criar Primeiro Usuário
                 </a>

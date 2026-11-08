@@ -1,182 +1,240 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
     <meta charset="UTF-8">
-    <title>Detalhes do Pedido #{{ pedido.id }}</title>
+    <title>Pedido #{{ pedido.id }} | SEMAE</title>
     <link rel="stylesheet" href="{% static 'produtos/estoque_lista.css' %}">
-    <link rel="stylesheet" href="{% static 'produtos/detalhe_pedido.css' %}">
     <style>
-        /* CSS para ocultar elementos da interface ao imprimir */
         @media print {
-            .no-print, nav, footer, .form-adicionar, .button-place, .acoes-pedido {
-                display: none !important;
-            }
-            body { background-color: white !important; color: black !important; }
-            .container { box-shadow: none !important; width: 100% !important; margin: 0 !important; }
-        }
-
-        .alert {
-            padding: 10px;
-            border-radius: 5px;
-        }
-
-        .alert-error {
-            background-color: #f8d7da;
-        }
-
-        .alert-success {
-            background-color: #d4edda;
+            .no-print { display: none !important; }
+            body { background: #fff !important; padding: 0 !important; }
+            .estoque-container { box-shadow: none !important; padding: 0 !important; }
         }
     </style>
 </head>
-
 <body>
-    <div class="container">
-        
-        <!-- Mensagens de Alerta (Estoque Insuficiente, Sucesso, etc) -->
+    <div class="estoque-container">
         {% if messages %}
-            <div class="mensagens-alerta no-print" style="margin-bottom: 20px;">
+            <div class="no-print">
                 {% for message in messages %}
-                    <div class="alert {% if message.tags == 'error' %}alert-error{% else %}alert-success{% endif %}">
-                        {{ message }}
-                    </div>
+                    <div class="alerta-msg {{ message.tags }}">{{ message }}</div>
                 {% endfor %}
             </div>
         {% endif %}
 
-        <div class="pedido-info">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h1>Pedido de Solicitação #{{ pedido.id }} ({{ pedido.get_categoria_display }})</h1>
-                <button onclick="window.print()" class="btn btn-secondary no-print" style="padding: 8px 15px; cursor: pointer;">
-                    🖨️ Imprimir Pedido
+        <header class="topo-estoque">
+            <div class="topo-titulo">
+                <h1>Pedido #{{ pedido.id }} — {{ pedido.get_categoria_display }}</h1>
+                <p>
+                    Data: <strong>{{ pedido.data_pedido|date:"d/m/Y H:i" }}</strong> |
+                    Status: <span class="status-badge status-{{ pedido.status|lower }}">{{ pedido.get_status_display }}</span>
+                </p>
+            </div>
+            <div class="topo-acoes no-print">
+                <a href="{% url 'meus_pedidos' %}" class="btn-topo btn-voltar-menu">← Meus Pedidos</a>
+                <a href="{% url 'menu_principal' %}" class="btn-topo btn-voltar-menu">Menu Inicial</a>
+                <button type="button" onclick="window.print()" class="btn-topo btn-lotes" style="border:none; cursor:pointer;">
+                    🖨️ Imprimir
                 </button>
             </div>
-            
-            {% if pedido.status == 'REJEITADO' and pedido.justificativa_rejeicao %}
-                <div class="aviso-rejeicao">
-                    <h3>⛔ Pedido Rejeitado</h3>
-                    <p><strong>Motivo da rejeição:</strong></p>
-                    <div class="texto-justificativa">
-                        "{{ pedido.justificativa_rejeicao }}"
-                    </div>
-                </div>
-            {% endif %}
-            <p><strong>Status:</strong> {{ pedido.get_status_display }}</p>
-            <p><strong>Data:</strong> {{ pedido.data_pedido|date:"d/m/Y H:i" }}</p>
-        </div>
+        </header>
 
-        <div class="itens-lista">
-            <h2>Itens Padrão no Pedido</h2>
-            {% if itens %}
-            <table>
+        {% if pedido.status == 'REJEITADO' and pedido.justificativa_rejeicao %}
+            <div class="alerta-msg error" style="margin-bottom: 25px;">
+                <strong>Motivo da Rejeição:</strong> "{{ pedido.justificativa_rejeicao }}"
+            </div>
+        {% endif %}
+
+        {% if pedido.status == 'PENDENTE' %}
+        <div class="grid-duas-colunas no-print" style="margin-bottom: 28px;">
+            <!-- Coluna 1: Adicionar do Estoque -->
+            <div class="card-secao">
+                <h3>1. Adicionar Produto do Estoque</h3>
+                <form method="post" id="form-item-comum">
+                    {% csrf_token %}
+                    <label for="{{ form.produto.id_for_label }}">Produto Disponível:</label>
+                    {{ form.produto }}
+                    <label for="{{ form.quantidade.id_for_label }}">Quantidade Desejada:</label>
+                    {{ form.quantidade }}
+                    <button type="submit" name="add_item_comum" class="btn-topo btn-novo-produto" style="border:none; cursor:pointer; width:100%; justify-content:center;">
+                        + Incluir Produto no Pedido
+                    </button>
+                </form>
+            </div>
+
+            <!-- Coluna 2: Item Especial adaptado por Categoria -->
+            <div class="card-secao" style="background: #fffdf5; border-color: #ffeeba;">
+                {% if pedido.categoria == 'ESCOLAR' %}
+                    <h3 style="color: #856404;">2. Solicitação Especial (Material Fora do Catálogo)</h3>
+                {% else %}
+                    <h3 style="color: #856404;">2. Solicitação Especial (Perecíveis / Fora do Estoque)</h3>
+                {% endif %}
+                <form method="post" id="form-item-especial">
+                    {% csrf_token %}
+                    <label>Descrição do Item:</label>
+                    {{ form_especial.descricao }}
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <div>
+                            <label>Quantidade:</label>
+                            {{ form_especial.quantidade }}
+                        </div>
+                        <div>
+                            <label>Unidade:</label>
+                            {{ form_especial.unidade }}
+                        </div>
+                    </div>
+                    <button type="submit" name="add_item_especial" class="btn-topo" style="background:#ff9800; color:#fff; border:none; cursor:pointer; width:100%; justify-content:center;">
+                        + Incluir Item Especial
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Só exibe a tabela de Itens de Estoque se houver itens -->
+        {% if itens %}
+        <h3 style="color: #004d99; margin-bottom: 10px;">Itens do Estoque Solicitados ({{ itens|length }})</h3>
+        <div class="tabela-estoque-wrapper" style="margin-bottom: 25px;">
+            <table class="tabela-estoque">
                 <thead>
                     <tr>
                         <th>Produto</th>
                         <th>Quantidade</th>
-                        <th class="no-print">Ações</th>
+                        <th>Unidade</th>
+                        {% if pedido.status == 'PENDENTE' %}
+                            <th class="no-print">Ação</th>
+                        {% endif %}
                     </tr>
                 </thead>
                 <tbody>
                     {% for item in itens %}
                     <tr>
-                        <td>{{ item.produto.nome }}</td>
-                        <td>{{ item.quantidade }}</td>
+                        <td><strong>{{ item.produto.nome }}</strong></td>
+                        <td><strong>{{ item.quantidade }}</strong></td>
+                        <td>{{ item.produto.get_unidade_medida_display }}</td>
+                        {% if pedido.status == 'PENDENTE' %}
                         <td class="no-print">
-                            {% if pedido.status == 'PENDENTE' %}
-                            <form method="post" action="{% url 'remover_item_pedido' item.id %}" style="display: inline-table;">
+                            <form method="post" action="{% url 'remover_item_pedido' item.id %}" style="margin:0;">
                                 {% csrf_token %}
-                                <button type="submit" onclick="return confirm('Tem certeza que deseja remover este item?');">Remover</button>
+                                <button type="submit" class="btn-tabela btn-arquivar" style="cursor:pointer;">Remover</button>
                             </form>
-                            {% else %}
-                            -
-                            {% endif %}
                         </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
-            {% else %}
-            <p>Nenhum item padrão adicionado a este pedido ainda.</p>
-            {% endif %}
         </div>
-        
-        <div class="itens-lista" style="margin-top: 20px;">
-            <h2>Itens Especiais (Fora do Estoque)</h2>
-            {% if itens_especiais %}
-            <table style="background-color: #fff3cd;">
+        {% endif %}
+
+        <!-- Só exibe a tabela de Itens Especiais se houver itens especiais -->
+        {% if itens_especiais %}
+        <h3 style="color: #856404; margin-bottom: 10px;">Solicitações Especiais Incluídas ({{ itens_especiais|length }})</h3>
+        <div class="tabela-estoque-wrapper" style="margin-bottom: 25px;">
+            <table class="tabela-estoque">
                 <thead>
                     <tr>
-                        <th>Descrição</th>
-                        <th>Quantidade/Unidade</th>
-                        <th class="no-print">Ações</th>
+                        <th>Descrição do Item</th>
+                        <th>Quantidade Solicitada</th>
+                        {% if pedido.status == 'PENDENTE' %}
+                            <th class="no-print">Ação</th>
+                        {% endif %}
                     </tr>
                 </thead>
                 <tbody>
                     {% for especial in itens_especiais %}
                     <tr>
-                        <td>{{ especial.descricao }}</td>
+                        <td><strong>{{ especial.descricao }}</strong></td>
                         <td>{{ especial.quantidade }} {{ especial.unidade }}</td>
+                        {% if pedido.status == 'PENDENTE' %}
                         <td class="no-print">
-                            {% if pedido.status == 'PENDENTE' %}
-                            <form method="post" action="{% url 'remover_item_especial' especial.id %}" style="display: inline-table;">
+                            <form method="post" action="{% url 'remover_item_especial' especial.id %}" style="margin:0;">
                                 {% csrf_token %}
-                                <button type="submit" onclick="return confirm('Tem certeza que deseja remover esta solicitação especial?');">Remover</button>
+                                <button type="submit" class="btn-tabela btn-arquivar" style="cursor:pointer;">Remover</button>
                             </form>
-                            {% else %}
-                            -
-                            {% endif %}
                         </td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
-            {% else %}
-            <p>Nenhum item especial adicionado.</p>
-            {% endif %}
-        </div>
-        
-        <hr>
-
-        {% if pedido.status == 'PENDENTE' %}
-        <div class="form-adicionar no-print" style="display: flex; gap: 30px;">
-            <!-- Formulário de Itens de Estoque -->
-            <div style="flex: 1;">
-                <h3>Adicionar Item de Estoque</h3>
-                <form method="post">
-                    {% csrf_token %}
-                    {{ form.as_p }}
-                    <button type="submit" name="add_item_comum" class="btn btn-primary">Adicionar Item Padrão</button>
-                </form>
-            </div>
-            
-            <!-- Formulário de Itens Especiais -->
-            <div style="flex: 1; border-left: 1px solid #ccc; padding-left: 30px;">
-                <h3>Adicionar Solicitação Especial</h3>
-                <form method="post">
-                    {% csrf_token %}
-                    {{ form_especial.as_p }}
-                    <button type="submit" name="add_item_especial" class="btn btn-warning">Adicionar Item Especial</button>
-                </form>
-            </div>
-        </div> 
-        
-        <div class="acoes-pedido no-print" style="margin-top: 40px; text-align: center; background: #f8f9fa; padding: 20px; border-radius: 8px;">
-            <h3>Deseja concluir e enviar para aprovação?</h3>
-            <form method="POST" action="{% url 'finalizar_pedido' pedido.id %}" onsubmit="return confirm('Verificou todos os itens? O pedido será enviado para análise e você não poderá mais alterá-lo.');">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-success" style="font-size: 1.2em; padding: 10px 30px;">Finalizar Pedido</button>
-            </form>
         </div>
         {% endif %}
 
-        <br><br>
-
-        <div class="button-place no-print">
-            <a href="{% url 'menu_diretor' %}" class="btn-custom-modern btn-back-dark">← Voltar ao Menu</a>
-            <a href="{% url 'meus_pedidos' %}" class="btn-custom-modern btn-primary-blue">Ver Meus Pedidos</a>
+        {% if not itens and not itens_especiais %}
+        <div style="text-align: center; padding: 28px; background: #f8f9fa; border: 1px dashed #ced4da; border-radius: 10px; color: #6c757d;">
+            Nenhum item foi incluído neste pedido ainda. Utilize os campos acima para adicionar produtos.
         </div>
+        {% endif %}
+
+        <!-- Barra simples à direita para Concluir e Enviar Pedido -->
+        {% if pedido.status == 'PENDENTE' %}
+            {% if itens or itens_especiais %}
+            <div class="no-print" style="display: flex; justify-content: flex-end; align-items: center; gap: 16px; margin-top: 20px; padding-top: 18px; border-top: 1px solid #e9ecef;">
+                <span style="color: #6c757d; font-size: 0.92rem;">Confira os itens antes de finalizar:</span>
+                <form method="POST" action="{% url 'finalizar_pedido' pedido.id %}" style="margin: 0;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn-topo btn-novo-produto" style="border:none; cursor:pointer; padding: 12px 26px; font-size: 1rem;">
+                        ✓ Concluir e Enviar Pedido
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+        {% endif %}
     </div>
+
+    <!-- Script para não perder o que foi digitado no outro formulário ao clicar em Incluir -->
+    <script>
+        (function() {
+            const storageKey = 'rascunho_pedido_{{ pedido.id }}';
+            const formComum = document.getElementById('form-item-comum');
+            const formEspecial = document.getElementById('form-item-especial');
+            if (!formComum || !formEspecial) return;
+
+            const campos = ['produto', 'quantidade', 'descricao', 'unidade'];
+            const inputQtdEsp = formEspecial.querySelector('[name="quantidade"]');
+
+            // Restaura valores salvos ao recarregar a página
+            const salvo = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
+            if (salvo.produto) formComum.querySelector('[name="produto"]').value = salvo.produto;
+            if (salvo.qtd_comum) formComum.querySelector('[name="quantidade"]').value = salvo.qtd_comum;
+            if (salvo.descricao) formEspecial.querySelector('[name="descricao"]').value = salvo.descricao;
+            if (salvo.unidade) formEspecial.querySelector('[name="unidade"]').value = salvo.unidade;
+            if (salvo.qtd_esp && inputQtdEsp) inputQtdEsp.value = salvo.qtd_esp;
+
+            function salvarRascunho() {
+                const dados = {
+                    produto: formComum.querySelector('[name="produto"]').value,
+                    qtd_comum: formComum.querySelector('[name="quantidade"]').value,
+                    descricao: formEspecial.querySelector('[name="descricao"]').value,
+                    unidade: formEspecial.querySelector('[name="unidade"]').value,
+                    qtd_esp: inputQtdEsp ? inputQtdEsp.value : ''
+                };
+                sessionStorage.setItem(storageKey, JSON.stringify(dados));
+            }
+
+            formComum.addEventListener('input', salvarRascunho);
+            formComum.addEventListener('change', salvarRascunho);
+            formEspecial.addEventListener('input', salvarRascunho);
+
+            // Ao enviar o formulário comum, limpa apenas os dados do comum e preserva o especial
+            formComum.addEventListener('submit', function() {
+                const atual = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
+                delete atual.produto;
+                delete atual.qtd_comum;
+                sessionStorage.setItem(storageKey, JSON.stringify(atual));
+            });
+
+            // Ao enviar o formulário especial, limpa apenas os dados do especial e preserva o comum
+            formEspecial.addEventListener('submit', function() {
+                const atual = JSON.parse(sessionStorage.getItem(storageKey) || '{}');
+                delete atual.descricao;
+                delete atual.unidade;
+                delete atual.qtd_esp;
+                sessionStorage.setItem(storageKey, JSON.stringify(atual));
+            });
+        })();
+    </script>
 </body>
 </html>

@@ -5,7 +5,7 @@ from .forms import TipoProdutoForm, ItemPedidoForm, Loteform, AdicionarEstoqueFo
 from usuarios.views import is_nutricionista, is_estoquista, pode_ver_estoque
 from .models import Pedido, ItemPedido, TipoProduto, Lote, Usuario, ItemEspecial
 from django.db import transaction
-from django.db.models import Q, F, Sum, IntegerField, OuterRef, Subquery, DecimalField
+from django.db.models import Q, F, Sum, IntegerField, OuterRef, Subquery, DecimalField, Case, When
 from django.db.models.functions import Coalesce
 from django.contrib import messages
 from datetime import date, datetime, timedelta
@@ -25,91 +25,125 @@ from django.contrib import messages
 from django.shortcuts import redirect
 
 @login_required
-@user_passes_test(pode_ver_estoque) 
+@user_passes_test(pode_ver_estoque)
 def listar_tipos_produto(request):
-    tipos_produto = TipoProduto.objects.all()
-    
-    busca = request.GET.get('buscar')
+    tipos_produto = TipoProduto.objects.annotate(
+        total_estoque=Coalesce(Sum('lotes__quantidade_pacotes'), 0, output_field=IntegerField()),
+        total_lotes=Coalesce(
+            Sum(
+                Case(
+                    When(lotes__quantidade_pacotes__gt=0, then=1),
+                    default=0,
+                    output_field=IntegerField()
+                )
+            ), 0
+        )
+    )
+
+    busca = request.GET.get('buscar', '').strip()
     if busca:
         tipos_produto = tipos_produto.filter(nome__icontains=busca)
-        
-    tipo = request.GET.get('tipo')
+
+    tipo = request.GET.get('tipo', 'TODOS')
     if tipo and tipo != 'TODOS':
         tipos_produto = tipos_produto.filter(tipo=tipo)
-        
-    ordem = request.GET.get('ordem')
-    if ordem == 'nome':
-        tipos_produto = tipos_produto.order_by('nome')
-        
-    ativo = request.GET.get('ativo')
+
+    ativo = request.GET.get('ativo', 'True')
     if ativo == 'False':
         tipos_produto = tipos_produto.filter(ativo=False)
     else:
         tipos_produto = tipos_produto.filter(ativo=True)
-    
+
+    ordem = request.GET.get('ordem', 'nome')
+    if ordem == 'estoque_asc':
+        tipos_produto = tipos_produto.order_by('total_estoque', 'nome')
+    elif ordem == 'estoque_desc':
+        tipos_produto = tipos_produto.order_by('-total_estoque', 'nome')
+    else:
+        tipos_produto = tipos_produto.order_by('nome')
+
     return render(request, 'produtos/listar_tipos.html', {
         'tipos_produto': tipos_produto,
         'tipos': TipoProduto.PRODUTO_TIPO,
-        'busca': busca or '',
-        'tipo_selecionado': tipo or 'TODOS',
-        'ordem': ordem or '',
-        'ativo': ativo or 'True',
-    }) 
+        'busca': busca,
+        'tipo_selecionado': tipo,
+        'ordem': ordem,
+        'ativo': ativo,
+    })
 
 @login_required
 @user_passes_test(is_estoquista)
 def cadastrar_tipo_produto(request):
     if request.method == 'POST':
         form = TipoProdutoForm(request.POST)
-        lote_form = Loteform(request.POST) 
-        
+        lote_form = Loteform(request.POST)
+
         if form.is_valid():
-            produto = form.save()
-            
-            # Se for um cadastro novo, tentamos salvar o lote inicial
-            # Forçamos a validação de datas para falso se o produto não pedir
-            if not produto.possui_data_fabricacao:
-                lote_form.errors.pop('data_fabricacao', None)
-            if not produto.possui_data_validade:
-                lote_form.errors.pop('data_validade', None)
-                
-            if lote_form.is_valid():
-                lote = lote_form.save(commit=False)
-                lote.tipo_produto = produto
-                lote.save()
-                messages.success(request, f"Produto '{produto.nome}' e lote inicial cadastrados com sucesso!")
-            else:
-                messages.warning(request, f"Produto '{produto.nome}' criado, mas verifique os dados do lote inicial.")
-                
-            return redirect('listar_tipos_produto')
+            with transaction.atomic():
+                produto = form.save()
+                qtd_inicial = request.POST.get('quantidade_pacotes')
+
+                # Só cria lote inicial se o estoquista informou quantidade > 0
+                if qtd_inicial and int(qtd_inicial) > 0:
+                    lote_form = Loteform(request.POST, tipo_produto=produto)
+                    if lote_form.is_valid():
+                        lote = lote_form.save(commit=False)
+                        lote.tipo_produto = produto
+                        lote.save()
+                        messages.success(request, f"Produto '{produto.nome}' e lote inicial (#{lote.id}) cadastrados com sucesso!")
+                        return redirect('listar_tipos_produto')
+                    else:
+                        # Cancela a transação e exibe os erros do lote na tela
+                        transaction.set_rollback(True)
+                else:
+                    messages.success(request, f"Produto '{produto.nome}' cadastrado no catálogo (sem lote inicial).")
+                    return redirect('listar_tipos_produto')
     else:
         form = TipoProdutoForm()
         lote_form = Loteform()
-    
+
     return render(request, 'produtos/cadastrar_tipo.html', {'form': form, 'lote_form': lote_form})
 
 @login_required
 @user_passes_test(pode_ver_estoque)
 def listar_lotes(request, tipo_produto_id):
     tipo_produto = get_object_or_404(TipoProduto, pk=tipo_produto_id)
-    lotes = Lote.objects.filter(tipo_produto=tipo_produto).order_by(F('data_validade').asc(nulls_last=True))
-    
+    lotes = Lote.objects.filter(tipo_produto=tipo_produto).order_by(F('data_validade').asc(nulls_last=True), 'id')
+
     hoje = date.today()
     alerta_dias = 30
-    
-    for lote in lotes:
-        if lote.data_validade is None:
-            lote.alerta_classe = 'lote-sem-validade' 
-            continue 
 
-        if lote.data_validade < hoje:
+    total_pacotes = 0
+    total_volume = 0
+    lotes_vencidos = 0
+
+    for lote in lotes:
+        total_pacotes += lote.quantidade_pacotes
+        total_volume += lote.quantidade_total_unidade
+
+        if lote.data_validade is None:
+            lote.alerta_classe = 'lote-sem-validade'
+            lote.status_validade = 'Sem Validade'
+        elif lote.data_validade < hoje:
             lote.alerta_classe = 'lote-vencido'
+            lote.status_validade = 'Vencido'
+            if lote.quantidade_pacotes > 0:
+                lotes_vencidos += 1
         elif lote.data_validade <= hoje + timedelta(days=alerta_dias):
             lote.alerta_classe = 'lote-proximo-vencimento'
+            dias_restantes = (lote.data_validade - hoje).days
+            lote.status_validade = f'Vence em {dias_restantes} d'
         else:
-            lote.alerta_classe = ''
-            
-    context = {'tipo_produto': tipo_produto, 'lotes': lotes}
+            lote.alerta_classe = 'lote-ok'
+            lote.status_validade = 'Regular'
+
+    context = {
+        'tipo_produto': tipo_produto,
+        'lotes': lotes,
+        'total_pacotes': total_pacotes,
+        'total_volume': total_volume,
+        'lotes_vencidos': lotes_vencidos,
+    }
     return render(request, 'produtos/listar_lotes.html', context)
     
 @login_required
@@ -758,6 +792,7 @@ def exportar_pdf_tipos(dados, total_valor, total_lotes, total_produtos, mes, ano
 
 
 # Apenas secretário pode gerar relatório de consumo
+@login_required
 @user_passes_test(lambda u: u.is_secretario())
 def gerar_relatorio_mensal(request):
     mes = request.GET.get('mes')
@@ -769,12 +804,11 @@ def gerar_relatorio_mensal(request):
         'data_pedido__year': ano,
         'status__in': ['PENDENTE', 'APROVADO', 'ENTREGUE']
     }
-    
     filtros_itens = {
         'pedido__data_pedido__year': ano,
         'pedido__status__in': ['PENDENTE', 'APROVADO', 'ENTREGUE']
     }
-    
+
     if mes and mes != '0':
         filtros_pedidos['data_pedido__month'] = mes
         filtros_itens['pedido__data_pedido__month'] = mes
@@ -783,36 +817,33 @@ def gerar_relatorio_mensal(request):
     if diretor_id and diretor_id != 'todos':
         filtros_pedidos['solicitante_id'] = diretor_id
         filtros_itens['pedido__solicitante_id'] = diretor_id
-        
-        diretor_obj = Usuario.objects.get(id=diretor_id)
-        
-        # Tenta pegar o nome da escola, se não tiver, usa o username mesmo
-        if hasattr(diretor_obj, 'escola_diretoria'):
+
+        diretor_obj = get_object_or_404(Usuario, id=diretor_id)
+        if hasattr(diretor_obj, 'escola') and diretor_obj.escola:
             nome_diretor = diretor_obj.escola.nome_escola
         else:
             nome_diretor = diretor_obj.username
 
     pedidos_no_periodo = Pedido.objects.filter(**filtros_pedidos)
     total_pedidos = pedidos_no_periodo.count()
+
+    # CORREÇÃO: Usa ItemEspecial em vez do campo antigo observacao_carne
+    pedidos_especiais = pedidos_no_periodo.filter(
+        itens_especiais__isnull=False
+    ).select_related('solicitante', 'solicitante__escola').prefetch_related('itens_especiais').distinct()
     
-    pedidos_carne = pedidos_no_periodo.exclude(observacao_carne="").exclude(observacao_carne__isnull=True).select_related('solicitante', 'solicitante__escola')
-    total_pedidos_carne = pedidos_carne.count()
+    total_pedidos_carne = pedidos_especiais.count()
     is_todas_escolas = (diretor_id == 'todos' or not diretor_id)
-    
+
     lista_detalhada_carne = []
-    for p in pedidos_carne:
+    for p in pedidos_especiais:
+        resumo_itens = ", ".join([f"{ie.quantidade} {ie.unidade} de {ie.descricao}" for ie in p.itens_especiais.all()])
         if is_todas_escolas:
-            # Verifica se existe o perfil escola para exibir o nome correto
-            if hasattr(p.solicitante, 'escola'):
-                nome_exibicao = p.solicitante.escola.nome_escola
-            else:
-                nome_exibicao = p.solicitante.username
-            
-            lista_detalhada_carne.append(f"{nome_exibicao}: {p.observacao_carne}")
+            nome_exibicao = p.solicitante.escola.nome_escola if hasattr(p.solicitante, 'escola') else p.solicitante.username
+            lista_detalhada_carne.append(f"{nome_exibicao}: {resumo_itens}")
         else:
-            lista_detalhada_carne.append(p.observacao_carne)
-    
-    
+            lista_detalhada_carne.append(resumo_itens)
+
     preco_real_subquery = Lote.objects.filter(
         tipo_produto_id=OuterRef('produto_id')
     ).order_by('-id').values('preco_unitario')[:1]
@@ -822,18 +853,17 @@ def gerar_relatorio_mensal(request):
         'produto__unidade_medida',
         'produto_id'
     ).annotate(
-        total_solicitado=Sum('quantidade', distinct=True),
+        total_solicitado=Sum('quantidade'),
         valor_total_produto=Sum(
-            F('quantidade') * Subquery(preco_real_subquery),
+            F('quantidade') * Coalesce(Subquery(preco_real_subquery), 0, output_field=DecimalField()),
             output_field=DecimalField(max_digits=10, decimal_places=2)
         )
     ).order_by('produto__nome')
-    
+
     dados = []
     for item in dados_raw:
         qtd = item.get('total_solicitado') or 0
         total_rs = item.get('valor_total_produto') or 0
-    
         dados.append({
             'produto__nome': item['produto__nome'],
             'produto__unidade_medida': item['produto__unidade_medida'],
@@ -843,24 +873,23 @@ def gerar_relatorio_mensal(request):
         })
 
     grafico_buffer = None
-    if diretor_id == 'todos' or not diretor_id:
+    if is_todas_escolas:
         dados_grafico = ItemPedido.objects.filter(**filtros_itens).values(
             'pedido__solicitante__username',
             'pedido__solicitante__escola__nome_escola'
         ).annotate(
             total_escola=Sum(
-                F('quantidade') * Subquery(preco_real_subquery),
+                F('quantidade') * Coalesce(Subquery(preco_real_subquery), 0, output_field=DecimalField()),
                 output_field=DecimalField(max_digits=10, decimal_places=2)
             )
         ).order_by('-total_escola')
-    
+
         if dados_grafico.exists():
             grafico_buffer = gerar_grafico_consumo_escolas(dados_grafico)
 
     if formato == 'excel':
         return exportar_excel(dados, mes, ano, nome_diretor, total_pedidos, total_pedidos_carne, lista_detalhada_carne)
-    else:
-        return exportar_pdf(dados, mes, ano, nome_diretor, total_pedidos, total_pedidos_carne, lista_detalhada_carne, grafico_buffer)
+    return exportar_pdf(dados, mes, ano, nome_diretor, total_pedidos, total_pedidos_carne, lista_detalhada_carne, grafico_buffer)
 
 
 
@@ -1037,7 +1066,7 @@ def detalhe_pedido(request, pedido_id):
     
     form_comum = ItemPedidoForm()
     form_comum.fields['produto'].queryset = produtos_validos
-    form_especial = ItemEspecialForm() # Formulário que criaremos no próximo passo
+    form_especial = ItemEspecialForm(categoria=pedido.categoria) # Formulário que criaremos no próximo passo
     
     if request.method == 'POST':
         # Se o formulário enviado for o de Item Comum
@@ -1074,7 +1103,7 @@ def detalhe_pedido(request, pedido_id):
 
         # Se o formulário enviado for o de Item Especial
         elif 'add_item_especial' in request.POST:
-            form_especial = ItemEspecialForm(request.POST)
+            form_especial = ItemEspecialForm(request.POST, categoria=pedido.categoria)
             if form_especial.is_valid():
                 item_esp = form_especial.save(commit=False)
                 item_esp.pedido = pedido
@@ -1213,16 +1242,14 @@ def listar_pedidos_pendentes(request):
 
 # Gestores veem detalhes do pedido
 @login_required
-@user_passes_test(lambda u: u.is_nutricionista() or u.is_secretario())
+@user_passes_test(lambda u: u.is_nutricionista() or u.is_secretario() or u.is_estoquista())
 def detalhe_pedido_gestor(request, pedido_id):
-    # NOTA: Renomeie o template 'detalhe_pedido_nutricionista.html' para 'detalhe_pedido_gestor.html' nas suas pastas
     pedido = get_object_or_404(Pedido.objects.select_related('solicitante', 'solicitante__escola'), id=pedido_id)
-    
-    # Trava de segurança
-    if pedido.categoria == 'ESCOLAR' and not request.user.is_secretario():
-        return HttpResponseForbidden("Apenas a Secretaria pode acessar pedidos escolares.")
-    elif pedido.categoria == 'ALIMENTICIO_LIMPEZA' and not request.user.is_nutricionista():
-        return HttpResponseForbidden("Apenas a Nutricionista pode acessar pedidos alimentícios.")
+
+    if request.user.is_secretario() and pedido.categoria != 'ESCOLAR':
+        return HttpResponseForbidden("Apenas a Nutricionista ou Estoquista podem acessar pedidos alimentícios.")
+    elif request.user.is_nutricionista() and pedido.categoria != 'ALIMENTICIO_LIMPEZA':
+        return HttpResponseForbidden("Apenas a Secretaria ou Estoquista podem acessar pedidos escolares.")
 
     return render(request, 'pedidos/detalhe_pedido_gestor.html', {'pedido': pedido})
 
@@ -1269,29 +1296,32 @@ def rejeitar_pedido(request, pedido_id):
 
 
 @login_required
-@user_passes_test(lambda u: u.is_nutricionista() or u.is_secretario())
+@user_passes_test(lambda u: u.is_nutricionista() or u.is_secretario() or u.is_estoquista())
 def historico_pedidos(request):
     pedidos_recentes = Pedido.objects.filter(
         status__in=['APROVADO', 'REJEITADO', 'ENTREGUE']
     ).select_related('solicitante__escola').order_by('-data_pedido')
-    
+
     if request.user.is_nutricionista():
         pedidos_recentes = pedidos_recentes.filter(categoria='ALIMENTICIO_LIMPEZA')
     elif request.user.is_secretario():
         pedidos_recentes = pedidos_recentes.filter(categoria='ESCOLAR')
-        
-    return render(request, 'pedidos/historico_pedidos.html', {'pedidos': pedidos_recentes[:20]})
+
+    return render(request, 'pedidos/historico_pedidos.html', {'pedidos': pedidos_recentes[:50]})
 
 
 @login_required
 @user_passes_test(lambda u: u.is_nutricionista() or u.is_secretario())
 def verificar_pedidos_pendentes(request):
-    contagem = Pedido.objects.filter(status='PENDENTE')
+    # Ignora rascunhos vazios sem itens
+    contagem = Pedido.objects.filter(status='PENDENTE').filter(
+        Q(itens__isnull=False) | Q(itens_especiais__isnull=False)
+    ).distinct()
     if request.user.is_nutricionista():
         contagem = contagem.filter(categoria='ALIMENTICIO_LIMPEZA')
     elif request.user.is_secretario():
         contagem = contagem.filter(categoria='ESCOLAR')
-        
+
     return JsonResponse({'count': contagem.count(), 'success': True})
 
 # --- NOVAS VIEWS DO ESTOQUISTA ---
@@ -1315,44 +1345,69 @@ def despachar_pedido(request, pedido_id):
     pedido = get_object_or_404(Pedido, id=pedido_id, status='APROVADO')
 
     if request.method == 'POST':
+        itens_estoque_ids = request.POST.getlist('itens_estoque')
+        itens_especiais_ids = request.POST.getlist('itens_especiais')
+
+        if not itens_estoque_ids and not itens_especiais_ids:
+            messages.warning(request, "Marque pelo menos um item na caixa de seleção para registrar a baixa/entrega.")
+            return redirect('detalhe_pedido_envio', pedido_id=pedido.id)
+
         try:
             with transaction.atomic():
-                produtos_ids = pedido.itens.values_list('produto_id', flat=True)
-                produtos_com_estoque = TipoProduto.objects.filter(id__in=produtos_ids).annotate(
-                    estoque_atual=Sum('lotes__quantidade_pacotes')
-                )
-                estoque_map = {p.id: p.estoque_atual or 0 for p in produtos_com_estoque}
-                
-                # Valida se ainda há estoque suficiente no momento do envio
-                for item in pedido.itens.all():
-                    if item.quantidade > estoque_map.get(item.produto.id, 0):
-                        raise Exception(f"Estoque insuficiente para '{item.produto.nome}'.")
+                # 1. Processa apenas os itens de estoque marcados agora e que ainda não foram entregues
+                itens_para_baixar = pedido.itens.filter(id__in=itens_estoque_ids, entregue=False)
 
-                # Debita do estoque
-                for item in pedido.itens.all():
-                    quantidade_a_baixar = item.quantidade
-                    lotes_disponiveis = Lote.objects.filter(
-                        tipo_produto=item.produto, 
-                        quantidade_pacotes__gt=0
-                    ).order_by('data_validade')
-                    
-                    for lote in lotes_disponiveis:
-                        if quantidade_a_baixar == 0:
-                            break
-                        if lote.quantidade_pacotes >= quantidade_a_baixar:
-                            lote.quantidade_pacotes -= quantidade_a_baixar
-                            quantidade_a_baixar = 0
-                        else:
-                            quantidade_a_baixar -= lote.quantidade_pacotes
-                            lote.quantidade_pacotes = 0
-                        lote.save()
-                
-                # Muda status final
-                pedido.status = 'ENTREGUE'
-                pedido.save()
-                messages.success(request, f"Pedido #{pedido.id} despachado com sucesso! Estoque debitado.")
+                if itens_para_baixar.exists():
+                    produtos_ids = itens_para_baixar.values_list('produto_id', flat=True)
+                    produtos_com_estoque = TipoProduto.objects.filter(id__in=produtos_ids).annotate(
+                        estoque_atual=Coalesce(Sum('lotes__quantidade_pacotes'), 0, output_field=IntegerField())
+                    )
+                    estoque_map = {p.id: p.estoque_atual for p in produtos_com_estoque}
+
+                    for item in itens_para_baixar:
+                        if item.quantidade > estoque_map.get(item.produto.id, 0):
+                            raise Exception(f"Estoque insuficiente para '{item.produto.nome}' (Disponível: {estoque_map.get(item.produto.id, 0)}).")
+
+                    for item in itens_para_baixar:
+                        quantidade_a_baixar = item.quantidade
+                        lotes_disponiveis = Lote.objects.filter(
+                            tipo_produto=item.produto,
+                            quantidade_pacotes__gt=0
+                        ).order_by(F('data_validade').asc(nulls_last=True), 'id')
+
+                        for lote in lotes_disponiveis:
+                            if quantidade_a_baixar == 0:
+                                break
+                            if lote.quantidade_pacotes >= quantidade_a_baixar:
+                                lote.quantidade_pacotes -= quantidade_a_baixar
+                                quantidade_a_baixar = 0
+                            else:
+                                quantidade_a_baixar -= lote.quantidade_pacotes
+                                lote.quantidade_pacotes = 0
+                            lote.save()
+
+                        item.entregue = True
+                        item.save()
+
+                # 2. Marca os itens especiais selecionados como entregues
+                if itens_especiais_ids:
+                    pedido.itens_especiais.filter(id__in=itens_especiais_ids, entregue=False).update(entregue=True)
+
+                # 3. Verifica se ainda resta algum item não entregue no pedido
+                ainda_faltam_comuns = pedido.itens.filter(entregue=False).exists()
+                ainda_faltam_especiais = pedido.itens_especiais.filter(entregue=False).exists()
+
+                if not ainda_faltam_comuns and not ainda_faltam_especiais:
+                    pedido.status = 'ENTREGUE'
+                    pedido.save()
+                    messages.success(request, f"Pedido #{pedido.id} totalmente separado e concluído como Entregue!")
+                    return redirect('listar_pedidos_envio')
+                else:
+                    messages.success(request, "Itens selecionados foram baixados e salvos! O pedido permanece na fila para entrega dos itens restantes.")
+                    return redirect('detalhe_pedido_envio', pedido_id=pedido.id)
 
         except Exception as e:
-            messages.error(request, f"Erro ao despachar o pedido #{pedido.id}: {e}")
+            messages.error(request, f"Erro ao processar separação do pedido #{pedido.id}: {e}")
+            return redirect('detalhe_pedido_envio', pedido_id=pedido.id)
 
     return redirect('listar_pedidos_envio')

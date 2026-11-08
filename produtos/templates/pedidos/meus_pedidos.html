@@ -1,58 +1,77 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Meus Pedidos</title>
-    <style>
-        body { font-family: sans-serif; }
-        .container { width: 80%; margin: auto; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-        th { background-color: #f2f2f2; }
-        .btn-novo { display: inline-block; padding: 10px 15px; margin-right: 10px; text-decoration: none; border-radius: 4px; color: #fff; }
-        .btn-alimento { background-color: #28a745; }
-        .btn-escolar { background-color: #007bff; }
-    </style>
+    <title>Meus Pedidos | SEMAE</title>
+    <link rel="stylesheet" href="{% static 'produtos/estoque_lista.css' %}">
 </head>
 <body>
-    <div class="container">
-        <h1>Meus Pedidos de Solicitação</h1>
-        <p>Acompanhe aqui o status de todos os seus pedidos.</p>
-        
-        <div style="margin-bottom: 20px;">
-            <a href="{% url 'criar_pedido' %}?categoria=ALIMENTICIO_LIMPEZA" class="btn-novo btn-alimento">Novo Pedido (Alimentação/Limpeza)</a>
-            <a href="{% url 'criar_pedido' %}?categoria=ESCOLAR" class="btn-novo btn-escolar">Novo Pedido (Escolar)</a>
-        </div>
-        <hr>
+    <div class="estoque-container">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alerta-msg {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Nº do Pedido</th>
-                    <th>Categoria</th>
-                    <th>Data da Solicitação</th>
-                    <th>Status</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for pedido in pedidos %}
-                <tr>
-                    <td>#{{ pedido.id }}</td>
-                    <td>{{ pedido.get_categoria_display }}</td>
-                    <td>{{ pedido.data_pedido|date:"d/m/Y H:i" }}</td>
-                    <td>{{ pedido.get_status_display }}</td>
-                    <td>
-                        <a href="{% url 'detalhe_pedido' pedido.id %}">Ver / Continuar Editando</a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="5">Você ainda não fez nenhum pedido.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <header class="topo-estoque">
+            <div class="topo-titulo">
+                <h1>Meus Pedidos e Histórico</h1>
+                <p>Acompanhe todas as solicitações realizadas pela sua escola.</p>
+            </div>
+            <div class="topo-acoes">
+                <a href="{% url 'menu_principal' %}" class="btn-topo btn-voltar-menu">← Voltar ao Menu</a>
+                <a href="{% url 'criar_pedido' %}?categoria=ALIMENTICIO_LIMPEZA" class="btn-topo btn-novo-produto">+ Pedido Alimentação/Limpeza</a>
+                <a href="{% url 'criar_pedido' %}?categoria=ESCOLAR" class="btn-topo btn-lotes">+ Pedido Escolar</a>
+            </div>
+        </header>
+
+        <div class="tabela-estoque-wrapper">
+            <table class="tabela-estoque">
+                <thead>
+                    <tr>
+                        <th>Nº do Pedido</th>
+                        <th>Categoria</th>
+                        <th>Data da Solicitação</th>
+                        <th>Status</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pedido in pedidos %}
+                    <tr>
+                        <td><strong>#{{ pedido.id }}</strong></td>
+                        <td><span class="badge-cat">{{ pedido.get_categoria_display }}</span></td>
+                        <td>{{ pedido.data_pedido|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            <span class="status-badge status-{{ pedido.status|lower }}">
+                                {{ pedido.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="acoes-grupo">
+                                <a href="{% url 'detalhe_pedido' pedido.id %}" class="btn-tabela btn-lotes">
+                                    {% if pedido.status == 'PENDENTE' %}Ver / Editar{% else %}Ver Detalhes{% endif %}
+                                </a>
+                                {% if pedido.status == 'PENDENTE' %}
+                                <form method="post" action="{% url 'excluir_pedido' pedido.id %}" style="margin:0;" onsubmit="return confirm('Deseja realmente excluir o Pedido #{{ pedido.id }}?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn-tabela btn-arquivar" style="cursor:pointer;">Excluir</button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 30px; color: #6c757d;">
+                            Nenhum pedido registrado até o momento.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </body>
 </html>
